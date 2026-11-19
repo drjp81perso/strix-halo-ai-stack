@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+python3 - <<'PY'
+import yaml
+from pathlib import Path
+files = ['compose.yaml','config/llama-swap.yaml'] + [str(p) for p in Path('registry').glob('*.yaml')]
+for f in files:
+    with open(f) as h: yaml.safe_load(h)
+    print('YAML OK',f)
+PY
+python3 -m json.tool config/audiocpp.json >/dev/null && echo 'JSON OK config/audiocpp.json'
+./scripts/generate-config --check
+# Scan every source that can regenerate or document commands, not only rendered config.
+if grep -R --line-number --fixed-strings --exclude=runtime-policy.yaml -- '--no-mmap' \
+   config templates registry; then
+  echo 'ERROR: obsolete --no-mmap found outside its forbidden-flag policy declaration.' >&2
+  exit 1
+fi
+for f in scripts/*; do bash -n "$f"; echo "SHELL OK $f"; done
+if docker info >/dev/null 2>&1; then
+  cp -n .env.example .env.validation
+  docker compose --env-file .env.validation config -q
+  rm -f .env.validation
+  echo 'COMPOSE OK'
+else
+  echo 'NOTICE: Docker daemon unavailable; skipped image/runtime validation.'
+fi

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+python3 - "$ROOT" "$@" <<'PY'
+"""Generate config/llama-swap.yaml from the canonical template with policy checks."""
+from pathlib import Path
+import argparse, shlex, sys, yaml
+
+root = Path(sys.argv[1])
+template = root / "templates/llama-swap.yaml"
+policy_path = root / "templates/runtime-policy.yaml"
+output = root / "config/llama-swap.yaml"
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--check", action="store_true", help="verify output is current without rewriting it")
+args = parser.parse_args(sys.argv[2:])
+
+raw = template.read_text()
+config = yaml.safe_load(raw)
+policy = yaml.safe_load(policy_path.read_text())
+forbidden = set(policy["llama_server"]["forbidden_flags"])
+errors = []
+for model_id, model in config.get("models", {}).items():
+    command = model.get("cmd", "")
+    try:
+        tokens = shlex.split(command, comments=True)
+    except ValueError as exc:
+        errors.append(f"{model_id}: invalid command quoting: {exc}")
+        continue
+    if "llama-server" not in tokens:
+        continue
+    bad = sorted(forbidden.intersection(tokens))
+    if bad:
+        errors.append(f"{model_id}: forbidden llama-server flags: {', '.join(bad)}")
+if errors:
+    print("Configuration generation refused:", file=sys.stderr)
+    for error in errors:
+        print(f"  - {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+if args.check:
+    if not output.exists() or output.read_text() != raw:
+        print(f"OUT OF DATE: run scripts/generate-config to regenerate {output.relative_to(root)}", file=sys.stderr)
+        raise SystemExit(1)
+    print("Generated configuration is current and policy-compliant.")
+else:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(raw)
+    print(f"Generated {output.relative_to(root)} from {template.relative_to(root)}")
+PY

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+printf 'Host MemAvailable: '; awk '/MemAvailable/{printf "%.1f GiB\n",$2/1024/1024}' /proc/meminfo
+for f in /sys/class/drm/card*/device/mem_info_gtt_{total,used}; do
+  [[ -r "$f" ]] || continue
+  awk -v n="$f" '{printf "%s: %.1f GiB\n",n,$1/1024/1024/1024}' "$f"
+done
+docker compose ps
+if [[ -f .env ]]; then
+  set -a; source .env; set +a
+  curl -fsS -H "Authorization: Bearer $AI_API_KEY" "http://${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}/running" 2>/dev/null || true
+  echo
+fi

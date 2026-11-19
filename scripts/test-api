@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+set -a; source .env; set +a
+base="http://${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}"
+auth=(-H "Authorization: Bearer $AI_API_KEY")
+curl -fsS "$base/health"; echo
+curl -fsS "${auth[@]}" "$base/v1/models" | python3 -m json.tool
+if [[ "${1:-}" == --generate ]]; then
+  tmp=$(mktemp)
+  trap 'rm -f "$tmp"' EXIT
+  curl -fsS "${auth[@]}" -H 'Content-Type: application/json' "$base/v1/chat/completions" \
+    -d '{"model":"llm/fast","messages":[{"role":"user","content":"Reply with exactly: local API ready"}],"max_tokens":64,"temperature":0,"stream":false}' \
+    | tee "$tmp" | python3 -m json.tool
+  python3 - "$tmp" <<'PY'
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+text = data['choices'][0]['message'].get('content', '').strip()
+if text != 'local API ready':
+    raise SystemExit(f"Generation assertion failed: expected 'local API ready', got {text!r}")
+print('Generation assertion passed.')
+PY
+fi

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+[[ -f .env ]] && { set -a; source .env; set +a; }
+BASE="http://${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}"; [[ "$BASE" == http://0.0.0.0:* ]] && BASE="http://127.0.0.1:${AI_PORT:-9292}"
+AUTH=(-H "Authorization: Bearer ${AI_API_KEY:?AI_API_KEY missing}")
+usage(){ cat <<'EOF'
+Usage: ./scripts/ai-stack COMMAND [ARGS]
+ start | stop | status | models | config | validate | ui
+ test MODEL_ID         Run one semantic/lifecycle test
+ test-all              Run every configured test sequentially
+ unload [MODEL_ID]     Unload one or all models
+ logs [MODEL_ID]       Buffered logs or one live model stream
+EOF
+}
+cmd=${1:-help}; shift || true
+case "$cmd" in
+ start) exec ./scripts/start;; stop) exec ./scripts/stop;; validate) exec ./scripts/validate;;
+ status) curl -fsS "$BASE/health"; echo; curl -fsS "${AUTH[@]}" "$BASE/running"|python3 -m json.tool; curl -fsS "${AUTH[@]}" "$BASE/metrics"|grep -E '^llamaswap_(memory|gpu_memory|gpu_util).* [0-9]'; docker compose ps 2>/dev/null||true;;
+ models) curl -fsS "${AUTH[@]}" "$BASE/v1/models"|python3 -c 'import json,sys;d=json.load(sys.stdin);print(f"{ID:<34} {STATE:<9} {CTX:<7} DESCRIPTION");[(print(f"{x["id"]:<34} {x.get("status",{}).get("value","?"):<9} {str(x.get("context_length","-")):<7} {x.get("description","")}")) for x in d["data"] if x.get("meta",{}).get("llamaswap",{}).get("type")=="model"]';;
+ config) sed -n '/^models:/,$p' config/llama-swap.yaml;;
+ test) [[ $# == 1 ]]||{ usage;exit 2;}; exec python3 tests/run.py "$1" --base "$BASE" --key "$AI_API_KEY";;
+ test-all) for m in llm/fast llm/coder llm/reasoning llm/vision retrieval/embedding retrieval/reranker speech/kokoro speech/whisper-large-v3-turbo; do echo "===== $m ====="; python3 tests/run.py "$m" --base "$BASE" --key "$AI_API_KEY"; done;;
+ unload) if (($#));then curl -fsS -X POST "${AUTH[@]}" "$BASE/api/models/unload/${1//\//%2F}";else curl -fsS -X POST "${AUTH[@]}" "$BASE/api/models/unload";fi;echo;;
+ logs) if (($#));then curl -NsS "${AUTH[@]}" "$BASE/logs/stream/$1";else curl -fsS "${AUTH[@]}" "$BASE/logs";fi;;
+ ui) printf 'Management: %s/ui\nOpenAI API: %s/v1\nMedia: http://%s:9293/\n' "$BASE" "$BASE" "${AI_BIND:-127.0.0.1}";;
+ help|-h|--help) usage;; *) usage;exit 2;; esac

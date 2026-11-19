@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+# Usage: admit-run <required-host-GiB> <max-current-GTT-GiB> -- command ...
+req="${1:?required host-available GiB}"
+maxgtt="${2:?maximum current GTT GiB}"
+shift 2
+[[ "${1:-}" == -- ]] && shift
+mem_kb=$(awk '/^MemAvailable:/ {print $2}' /host/proc/meminfo)
+mem_gb=$((mem_kb/1024/1024))
+gtt_bytes=0
+while IFS= read -r -d '' f; do
+  v=$(cat "$f" 2>/dev/null || echo 0)
+  (( v > gtt_bytes )) && gtt_bytes=$v
+done < <(find /host/sys/class/drm -name mem_info_gtt_used -print0 2>/dev/null)
+gtt_gb=$((gtt_bytes/1024/1024/1024))
+if (( mem_gb < req )); then
+  echo "admission denied: MemAvailable=${mem_gb}GiB, require=${req}GiB" >&2
+  exit 75
+fi
+if (( gtt_gb > maxgtt )); then
+  echo "admission denied: GTT used=${gtt_gb}GiB, max current=${maxgtt}GiB" >&2
+  exit 75
+fi
+echo "admission accepted: MemAvailable=${mem_gb}GiB GTT_used=${gtt_gb}GiB; exec: $*" >&2
+exec "$@"

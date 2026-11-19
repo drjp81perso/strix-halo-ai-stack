@@ -1,0 +1,337 @@
+schema: 1
+hardware_profile:
+  physical_ram_gib: 128
+  gpu_mappable_ceiling_gib: 96
+  normal_gpu_budget_gib: 90
+  protected_host_gib: 20
+  host_model_root: "${MODEL_DIR from .env; mounted as /models}"
+
+# enabled=true means the supplied llama-swap config exposes it immediately.
+# staged entries require the runtime/adapter described in docs/STAGED-MULTIMEDIA.md.
+models:
+  - id: llm/fast
+    enabled: true
+    role: fast-agent
+    engine: llama.cpp-vulkan
+    source: unsloth/Qwen3.5-35B-A3B-GGUF
+    files: [Qwen3.5-35B-A3B-Q5_K_M.gguf]
+    local_dir: models/llm/qwen35
+    license: Apache-2.0-base-model
+    approximate_weight_gib: 26.2
+    ttl_seconds: 1800
+
+  - id: llm/reasoning
+    enabled: true
+    role: strong-reasoning
+    engine: llama.cpp-vulkan
+    source: unsloth/Qwen3.5-122B-A10B-GGUF
+    include: [Q4_K_M/*.gguf]
+    local_dir: models/llm/qwen122
+    license: Apache-2.0-base-model
+    approximate_weight_gib: 76.5
+    ttl_seconds: 600
+
+  - id: llm/coder
+    enabled: true
+    role: coding-agent
+    engine: llama.cpp-vulkan
+    source: Qwen/Qwen3-Coder-Next-GGUF
+    include: [Qwen3-Coder-Next-Q5_K_M/*.gguf]
+    local_dir: models/llm/coder
+    license: Apache-2.0
+    approximate_weight_gib: 56.7
+    ttl_seconds: 900
+
+  - id: llm/vision
+    enabled: true
+    role: vision-language
+    engine: llama.cpp-vulkan
+    source: Qwen/Qwen3-VL-32B-Instruct-GGUF
+    files:
+      - Qwen3VL-32B-Instruct-Q4_K_M.gguf
+      - mmproj-Qwen3VL-32B-Instruct-Q8_0.gguf
+    local_dir: models/vision/qwen3vl
+    license: Apache-2.0
+    approximate_weight_gib: 22
+    ttl_seconds: 900
+
+  - id: retrieval/embedding
+    enabled: true
+    role: embedding
+    engine: llama.cpp-vulkan
+    source: Qwen/Qwen3-Embedding-4B-GGUF
+    files: [Qwen3-Embedding-4B-Q8_0.gguf]
+    local_dir: models/retrieval
+    license: Apache-2.0
+    approximate_weight_gib: 4.3
+    ttl_seconds: 1800
+
+  - id: retrieval/reranker
+    enabled: true
+    role: reranker
+    engine: llama.cpp-vulkan
+    source: Voodisss/Qwen3-Reranker-4B-GGUF-llama_cpp
+    files: [Qwen3-Reranker-4B-Q4_K_M.gguf]
+    local_dir: models/retrieval
+    license: Apache-2.0-base-model
+    approximate_weight_gib: 2.5
+    ttl_seconds: 1800
+
+  - id: speech/whisper-large-v3-turbo
+    enabled: true
+    role: speech-to-text
+    engine: whisper.cpp-vulkan
+    source: ggerganov/whisper.cpp
+    files: [ggml-large-v3-turbo-q5_0.bin]
+    local_dir: models/speech/whisper
+    license: MIT
+    approximate_weight_gib: 1.0
+    ttl_seconds: 1800
+
+  - id: speech/kokoro
+    enabled: true
+    role: text-to-speech
+    engine: audio.cpp-cpu
+    source: audio-cpp/audio.cpp-gguf
+    files: [Kokoro-82M-GGUF/kokoro-82m-q8_0.gguf]
+    local_dir: models/speech/kokoro
+    flatten: true
+    license: Apache-2.0
+    approximate_weight_gib: 0.3
+    ttl_seconds: 1800
+
+  # Curated speech/audio registry v2026.11.19.
+  # "balanced" favors permissive licensing, native/portable runtimes, and simple APIs.
+  # "experimental" favors frontier capability where gfx1151/runtime validation is incomplete.
+
+  - id: speech/qwen3-asr-0.6b
+    enabled: false
+    registry_track: balanced
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: multilingual-streaming-speech-to-text
+    engine: audio.cpp-hip-or-vulkan
+    source: QwenLM/Qwen3-ASR
+    artifact: Qwen/Qwen3-ASR-0.6B-hf
+    license: Apache-2.0
+    parameters_b: 0.6
+    approximate_upstream_disk_gib: 1.47
+    api: OpenAI-compatible-/v1/audio/transcriptions-via-audio.cpp
+    amd_support: native-audio.cpp-HIP/Vulkan-port; gfx1151 must be smoke-tested
+    confidence: high-model; medium-amd
+
+  - id: speech/moss-transcribe-diarize-0.9b
+    enabled: false
+    registry_track: balanced
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: long-form-stt-diarization-timestamps
+    engine: audio.cpp-hip-or-vulkan
+    source: OpenMOSS/MOSS-Transcribe-Diarize
+    artifact: OpenMOSS-Team/MOSS-Transcribe-Diarize
+    license: Apache-2.0
+    parameters_b: 0.9
+    approximate_upstream_disk_gib: 1.71
+    api: OpenAI-compatible-/v1/audio/transcriptions
+    amd_support: audio.cpp lists GGUF BF16/Q8/Q4 and streaming; HIP/Vulkan validation required
+    confidence: high-model; medium-amd
+
+  - id: speech/moss-tts-nano-100m
+    enabled: false
+    registry_track: balanced
+    registry_version: 2026.11.19
+    stage: adapter-and-quality-validation-required
+    role: cpu-realtime-tts-and-voice-cloning
+    engine: onnxruntime-cpu
+    source: OpenMOSS/MOSS-TTS-Nano
+    artifacts:
+      - OpenMOSS-Team/MOSS-TTS-Nano-100M-ONNX
+      - OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX
+    license: Apache-2.0
+    parameters_b: 0.1
+    approximate_upstream_disk_gib: 0.71
+    api: local-CLI/FastAPI; OpenAI-/v1/audio/speech-via-vLLM-Omni-or-adapter
+    amd_support: CPU-safe; audio.cpp HIP/Vulkan alternative available
+    confidence: high
+
+  - id: speech/qwen3-tts-0.6b-base
+    enabled: false
+    registry_track: balanced
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: multilingual-streaming-tts-and-voice-cloning
+    engine: audio.cpp-hip-or-vulkan
+    source: QwenLM/Qwen3-TTS
+    artifact: Qwen/Qwen3-TTS-12Hz-0.6B-Base
+    license: Apache-2.0
+    parameters_b: 0.6
+    approximate_upstream_disk_gib: 2.34
+    api: OpenAI-compatible-/v1/audio/speech-via-audio.cpp
+    amd_support: audio.cpp lists GGUF 16/Q8 streaming and LoRA; gfx1151 validation required
+    confidence: high-model; medium-amd
+
+  - id: music/ace-step-15-xl-turbo
+    enabled: false
+    registry_track: balanced
+    registry_version: 2026.11.19
+    stage: rocm-adapter-benchmark-required
+    role: text-to-music-cover-and-editing
+    engine: acestep-rocm
+    source: ace-step/ACE-Step-1.5
+    artifact: ACE-Step/ACE-Step-v1.5-XL-Turbo
+    license: MIT
+    parameters_b: 4
+    approximate_upstream_disk_gib: 50
+    api: official-REST-API-and-Gradio; typed-Open-WebUI-tool-recommended
+    amd_support: official ROCm requirements/scripts; gfx1151 benchmark still required
+    confidence: high-model; medium-high-amd
+
+  - id: speech/qwen3-asr-1.7b-aligner
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: frontier-multilingual-stt-with-forced-alignment
+    engine: audio.cpp-hip-or-vulkan
+    source: QwenLM/Qwen3-ASR
+    artifacts:
+      - Qwen/Qwen3-ASR-1.7B-hf
+      - Qwen/Qwen3-ForcedAligner-0.6B-hf
+    license: Apache-2.0
+    parameters_b: 2.3
+    approximate_upstream_disk_gib: 5.53
+    api: OpenAI-compatible-transcription plus alignment route via audio.cpp
+    amd_support: native GGUF ports listed; gfx1151 validation required
+    confidence: high-model; medium-amd
+
+  - id: speech/qwen3-tts-1.7b-suite
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: voice-cloning-voice-design-custom-voice
+    engine: audio.cpp-hip-or-vulkan
+    source: QwenLM/Qwen3-TTS
+    artifacts:
+      - Qwen/Qwen3-TTS-12Hz-1.7B-Base
+      - Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+      - Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+    license: Apache-2.0
+    parameters_b: 1.7-per-model
+    approximate_upstream_disk_gib: 4.23-per-base-checkpoint
+    api: OpenAI-compatible-/v1/audio/speech-via-audio.cpp
+    amd_support: native GGUF ports listed; test streaming, clone enrollment, and unloading
+    confidence: high-model; medium-amd
+
+  - id: speech/fish-drama3
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: license-and-audiocpp-validation-required
+    role: multi-character-tts-cloning-editing
+    engine: audio.cpp-hip-or-vulkan
+    source: fishaudio/fish-speech
+    license: Fish-Audio-Community-License
+    parameters_b: 35B-A3B-MoE
+    api: official-CLI/API; OpenAI-compatible speech through audio.cpp
+    amd_support: audio.cpp mixed-Q2/Q3/Q4/IQ3 port with stream; gfx1151 unverified
+    confidence: medium-high-model; medium-low-amd
+
+  - id: audio/mimo-audio-7b-instruct
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: rocm-port-required
+    role: general-audio-understanding-generation-editing
+    engine: pytorch-rocm-experimental
+    source: XiaomiMiMo/MiMo-Audio
+    artifacts:
+      - XiaomiMiMo/MiMo-Audio-7B-Instruct
+      - XiaomiMiMo/MiMo-Audio-Tokenizer
+    license: Apache-2.0-code; verify-model-card-license-before-promotion
+    parameters_b: 7-plus-1.2-tokenizer
+    approximate_upstream_disk_gib: 18.59
+    api: Python-and-Gradio; adapter-required
+    amd_support: upstream CUDA/FlashAttention only; ROCm substitution is unproven
+    confidence: high-model; low-amd
+
+  - id: music/yue2-3b
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-and-license-review-required
+    role: symbolic-planning-music-cover-and-agentic-editing
+    engine: audio.cpp-hip-or-vulkan
+    source: multimodal-art-projection/YuE
+    artifacts:
+      - m-a-p/YuE2-3B
+      - m-a-p/YuE2-Vae
+    license: Apache-2.0-code; CC-BY-NC-4.0-plus-terms-weights
+    parameters_b: 3
+    approximate_upstream_disk_gib: 7.28
+    api: staged-Python-API; audio.cpp-server task API
+    amd_support: audio.cpp GGUF BF16/Q8/Q4 port; upstream AMD path explicitly experimental
+    confidence: high-model; medium-low-amd
+
+  - id: music/heartmula-3b
+    enabled: false
+    registry_track: experimental
+    registry_version: 2026.11.19
+    stage: audiocpp-amd-validation-required
+    role: lyrics-conditioned-song-generation
+    engine: audio.cpp-hip-or-vulkan
+    source: HeartMuLa/heartlib
+    artifacts:
+      - HeartMuLa/HeartMuLa-oss-3B-happy-new-year
+      - HeartMuLa/HeartCodec-oss-20260123
+    license: Apache-2.0
+    parameters_b: 3-plus-codec
+    approximate_upstream_disk_gib: 20.85
+    api: Python-CLI; audio.cpp-server task API
+    amd_support: audio.cpp GGUF 16/Q8 and memory improvements; gfx1151 unverified
+    confidence: high-model; medium-amd
+
+  - id: speech/chatterbox-clone
+    enabled: false
+    stage: adapter-required
+    role: voice-cloning
+    engine: pytorch-rocm
+    source: ResembleAI/chatterbox
+    license: MIT
+    approximate_disk_gib: 10
+
+  - id: image/flux2-klein
+    enabled: false
+    stage: exact-artifact-validation-required
+    role: image-generation-editing
+    engine: stable-diffusion.cpp-vulkan
+    source: black-forest-labs/FLUX.2-klein-4B
+    license: Apache-2.0
+    approximate_disk_gib: 25
+
+  - id: image/z-image-turbo
+    enabled: false
+    stage: exact-artifact-validation-required
+    role: fast-image-generation
+    engine: stable-diffusion.cpp-vulkan
+    source: Tongyi-MAI/Z-Image-Turbo
+    license: Apache-2.0
+    approximate_disk_gib: 30
+
+  - id: video/wan22-5b
+    enabled: false
+    stage: comfyui-workflow-required
+    role: text-image-to-video
+    engine: comfyui-rocm
+    source: Wan-AI/Wan2.2-TI2V-5B
+    license: Apache-2.0
+    approximate_disk_gib: 45
+
+  - id: music/ace-step-xl
+    enabled: false
+    stage: openai-adapter-required
+    role: music-generation
+    engine: acestep-rocm
+    source: ACE-Step/ACE-Step-1.5
+    license: MIT
+    approximate_disk_gib: 50

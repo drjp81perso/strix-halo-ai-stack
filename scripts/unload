@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+set -a; source .env; set +a
+base="http://${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}"
+if [[ $# -eq 0 ]]; then
+  curl -fsS -X POST -H "Authorization: Bearer $AI_API_KEY" "$base/api/models/unload"
+else
+  curl -fsS -X POST -H "Authorization: Bearer $AI_API_KEY" "$base/api/models/unload/$1"
+fi
+echo

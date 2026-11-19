@@ -1,0 +1,58 @@
+name: strix-halo-ai
+
+services:
+  gateway:
+    build:
+      context: .
+      args:
+        LLAMA_SWAP_IMAGE: ghcr.io/mostlygeek/llama-swap:unified-vulkan
+    image: local/strix-halo-llama-swap:vulkan
+    container_name: strix-halo-llama-swap
+    restart: unless-stopped
+    ports:
+      - "${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}:8080"
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${VIDEO_GID}"
+      - "${RENDER_GID}"
+    environment:
+      LLAMA_SWAP_CONFIG: /etc/llama-swap/config/config.yaml
+      LLAMA_SWAP_LISTEN: 0.0.0.0:8080
+      LLAMA_SWAP_WATCH_CONFIG: "true"
+      AI_API_KEY: "${AI_API_KEY}"
+      MIN_HOST_AVAILABLE_GB: "${MIN_HOST_AVAILABLE_GB:-20}"
+      MAX_GTT_USED_GB: "${MAX_GTT_USED_GB:-92}"
+    volumes:
+      - ./config/llama-swap.yaml:/etc/llama-swap/config/config.yaml:ro
+      - ./config/audiocpp.json:/etc/llama-swap/audiocpp.json:ro
+      - ${MODEL_DIR:-./models}:/models:ro
+      - ./outputs:/outputs
+      - ./state:/state
+      # Admission checks read host memory and AMD GTT counters.
+      - /proc/meminfo:/host/proc/meminfo:ro
+      - /sys/class/drm:/host/sys/class/drm:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    stop_grace_period: 90s
+    networks: [ai]
+
+  media:
+    image: caddy:2.10-alpine
+    container_name: strix-halo-media
+    restart: unless-stopped
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", ":8080"]
+    volumes:
+      - ./outputs:/srv:ro
+    ports:
+      - "${AI_BIND:-127.0.0.1}:9293:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks: [ai]
+
+networks:
+  ai:
+    name: strix-halo-ai

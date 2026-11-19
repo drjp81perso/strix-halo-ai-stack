@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+cd "$ROOT"
+fail=0
+say(){ printf '%-30s %s\n' "$1" "$2"; }
+[[ -e /dev/dri/renderD128 ]] && say GPU_DEVICE OK || { say GPU_DEVICE MISSING; fail=1; }
+[[ -r /proc/meminfo ]] && say HOST_MEMORY OK || fail=1
+say KERNEL "$(uname -r)"
+say CMDLINE "$(cat /proc/cmdline)"
+for f in /sys/class/drm/card*/device/mem_info_gtt_total; do
+  [[ -r "$f" ]] || continue
+  gb=$(awk '{printf "%.1f GiB",$1/1024/1024/1024}' "$f")
+  say GTT_TOTAL "$gb ($f)"
+done
+say MEM_AVAILABLE "$(awk '/MemAvailable/{printf "%.1f GiB",$2/1024/1024}' /proc/meminfo)"
+command -v docker >/dev/null && say DOCKER "$(docker --version)" || { say DOCKER MISSING; fail=1; }
+docker compose version >/dev/null 2>&1 && say COMPOSE "$(docker compose version --short)" || { say COMPOSE MISSING; fail=1; }
+video=$(getent group video | cut -d: -f3 || true); render=$(getent group render | cut -d: -f3 || true)
+say VIDEO_GID "${video:-not-found}"; say RENDER_GID "${render:-not-found}"
+if [[ -f .env ]]; then
+  say ENV_FILE OK
+  set -a; source .env; set +a
+  model_dir=${MODEL_DIR:-$ROOT/models}
+  if [[ -d "$model_dir" && -r "$model_dir" ]]; then
+    say MODEL_DIR "$model_dir"
+  else
+    say MODEL_DIR "MISSING/UNREADABLE: $model_dir"
+    fail=1
+  fi
+else
+  say ENV_FILE "MISSING (copy .env.example)"
+fi
+exit "$fail"

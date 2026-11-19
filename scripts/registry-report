@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+python3 - "$ROOT" "$@" <<'PY'
+from pathlib import Path
+import sys, yaml
+root = Path(sys.argv[1])
+args = sys.argv[2:]
+paths = [Path(p) for p in args] or sorted((root/'registry').glob('models-v*.yaml'))
+for p in paths:
+    if not p.is_absolute(): p = root/p
+    d = yaml.safe_load(p.read_text())
+    print(f"\n{p.name}: {d.get('registry_id')} ({d.get('track')}) as of {d.get('as_of')}")
+    print('-' * 110)
+    for m in d.get('models', []):
+        roles = ','.join(m.get('roles') or [m.get('role','')])
+        src = m.get('source','')
+        print(f"{m.get('status','?'):<12} {m['id']:<32} {roles:<32} {src}")
+PY

@@ -1,0 +1,172 @@
+schema: 2
+registry_id: frontier-2026.11
+as_of: 2026-11-19
+track: frontier
+purpose: "Recent models with credible fit; validate runtime and artifacts before promotion"
+hardware_profile: { physical_ram_gib: 128, gpu_mappable_ceiling_gib: 96, normal_gpu_budget_gib: 90, protected_host_gib: 20 }
+policy:
+  advertise_only_promoted: true
+  candidates_are_not_download_instructions: true
+  reject_unverified_community_quants: true
+models:
+  - id: llm/qwen38-27b
+    roles: [agent, reasoning, coding, vision-language]
+    status: candidate
+    released: 2026-08
+    source: Qwen/Qwen3.8-27B
+    conversion: unsloth/Qwen3.8-27B-GGUF
+    preferred_quant: UD-Q6_K_M
+    approximate_weights_gib: 23.1
+    engine: llama.cpp-vulkan-or-rocm
+    license: Apache-2.0
+    fit: comfortable
+    confidence: high
+    notes: "Potentially replaces fast, coder, and vision slots after A/B evaluation."
+  - id: llm/mistral-small4-119b
+    roles: [reasoning, coding, vision-language, tools]
+    status: candidate
+    released: 2026-03
+    source: mistralai/Mistral-Small-4-119B-2603
+    conversion: unsloth/Mistral-Small-4-119B-2603-GGUF
+    preferred_quant: IQ4_XS
+    approximate_weights_gib: 58.1
+    engine: recent-llama.cpp-vulkan-or-rocm
+    license: Apache-2.0
+    fit: comfortable
+    confidence: medium-high
+  - id: llm/north-mini-code
+    roles: [coding]
+    status: laboratory
+    source: CohereLabs/North-Mini-Code-1.0
+    preferred_quant: projected-Q6
+    approximate_weights_gib: 28
+    engine: transformers-rocm-or-qualified-gguf
+    license: Apache-2.0
+    fit: comfortable
+    confidence: medium
+  - id: llm/aescode-32b
+    roles: [coding, vision-language]
+    status: laboratory
+    released: 2026-09
+    source: microsoft/AesCode-32B
+    preferred_quant: projected-Q5
+    approximate_weights_gib: 23
+    engine: transformers-rocm-or-qualified-gguf
+    license: Apache-2.0
+    fit: comfortable
+    confidence: medium
+  - id: retrieval/embeddinggemma2
+    roles: [embedding, multimodal-embedding]
+    status: candidate
+    released: 2026-09
+    source: google/embeddinggemma-2
+    conversion: ggml-org/embeddinggemma-2-GGUF
+    preferred_quant: Q8_0
+    approximate_weights_gib: 0.31
+    engine: llama.cpp
+    license: Apache-2.0-plus-use-policy
+    fit: trivial
+    confidence: high
+  - id: retrieval/jina-reranker35
+    roles: [reranking]
+    status: laboratory
+    source: jinaai/jina-reranker-v3.5
+    conversion: jinaai/jina-reranker-v3.5-GGUF
+    preferred_quant: Q8_0
+    approximate_weights_gib: 0.64
+    engine: llama.cpp-fork-or-upstream-when-merged
+    license: CC-BY-NC-4.0
+    fit: trivial
+    confidence: medium
+    blocker: "Custom scoring support not guaranteed in stock llama.cpp."
+  - id: speech/qwen3-asr-06b
+    roles: [speech-to-text]
+    status: candidate
+    source: Qwen/Qwen3-ASR-0.6B
+    engine: audio.cpp-vulkan-or-rocm
+    license: Apache-2.0
+    fit: trivial
+    confidence: medium
+  - id: speech/qwen3-tts-06b
+    roles: [text-to-speech, voice-cloning]
+    status: candidate
+    source: Qwen/Qwen3-TTS-12Hz-0.6B-Base
+    conversion: audio-cpp/audio.cpp-gguf
+    engine: audio.cpp-vulkan-or-rocm
+    license: Apache-2.0
+    fit: trivial
+    confidence: medium-high
+  - id: speech/moss-transcribe-diarize
+    roles: [speech-to-text, diarization, timestamps]
+    status: candidate
+    source: OpenMOSS-Team/MOSS-Transcribe-Diarize
+    engine: audio.cpp-or-transformers-rocm
+    license: Apache-2.0
+    fit: comfortable
+    confidence: medium
+  - id: speech/moss-tts-nano
+    roles: [text-to-speech, voice-cloning]
+    status: candidate
+    source: OpenMOSS-Team/MOSS-TTS-Nano
+    engine: onnx-cpu
+    license: Apache-2.0
+    fit: trivial
+    confidence: medium-high
+  - id: image/flux3-klein
+    roles: [image-generation, image-editing, multi-reference]
+    status: laboratory
+    released: 2026-11
+    source: black-forest-labs/flux-3-image-klein
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: verify-model-card-before-use
+    fit: comfortable
+    confidence: medium
+  - id: image/qwen-image21-turbo
+    roles: [image-generation, image-editing, rgba, typography]
+    status: candidate
+    source: Qwen/Qwen-Image-2.1
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: Qwen-Research-License
+    fit: comfortable
+    confidence: high
+  - id: image/z-image-turbo
+    roles: [image-generation, photorealism, typography]
+    status: candidate
+    source: Tongyi-MAI/Z-Image-Turbo
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: Apache-2.0
+    fit: comfortable
+    confidence: high
+  - id: video/wan22-a14b
+    roles: [text-to-video, image-to-video]
+    status: candidate
+    source: Wan-AI/Wan2.2-T2V-A14B
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: Apache-2.0
+    fit: comfortable-when-quantized
+    confidence: medium-high
+  - id: video/ltx25
+    roles: [video-generation, synchronized-audio-video]
+    status: candidate
+    source: Lightricks/LTX-2.5
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: LTX-2.x-Community
+    approximate_pipeline_gib: 66
+    fit: tight-but-credible
+    confidence: medium
+  - id: music/ace-step15-xl
+    roles: [music-generation, vocals, covers, editing]
+    status: candidate
+    source: ACE-Step/Ace-Step1.5
+    engine: acestep-rocm
+    license: MIT
+    fit: comfortable
+    confidence: medium-high
+  - id: music/heartmula-3b
+    roles: [music-generation, lyrics-conditioned-song]
+    status: laboratory
+    source: HeartMuLa/HeartMuLa-oss-3B
+    engine: audio.cpp-or-pytorch-rocm
+    license: Apache-2.0
+    fit: comfortable
+    confidence: medium

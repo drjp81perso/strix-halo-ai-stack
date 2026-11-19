@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+[[ -f .env ]] || { cp .env.example .env; echo 'Created .env; edit it and rerun.' >&2; exit 2; }
+./scripts/preflight
+./scripts/generate-config --check
+docker compose build --pull
+docker compose run --rm --entrypoint /usr/local/bin/check-runtime-flags gateway
+docker compose up -d
+sleep 3
+docker compose ps

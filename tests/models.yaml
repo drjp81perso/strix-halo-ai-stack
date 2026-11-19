@@ -1,0 +1,35 @@
+schema: 1
+tests:
+  llm/fast:
+    kind: exact-chat
+    max_tokens: 64
+    prompt: "Reply with exactly: local API ready"
+    expected: "local API ready"
+  llm/coder:
+    kind: python-code
+    max_tokens: 1024
+    prompt: "Write a complete Python function named merge_intervals(intervals) that merges overlapping closed integer intervals. Requirements: do not mutate input; accept unsorted pairs; treat touching endpoints as overlapping; return a sorted list of tuples; include a concise docstring; then provide exactly three assert tests covering unsorted overlap, touching endpoints, and empty input. Output only one Python code block."
+  llm/reasoning:
+    kind: bayes-reasoning
+    max_tokens: 1536
+    prompt: "A factory has three machines. Machine A makes 40 percent of items with 1 percent defective. Machine B makes 35 percent with 2 percent defective. Machine C makes 25 percent with 4 percent defective. An item is selected uniformly from all production and is defective. Compute the probability that it came from C. Show a compact derivation and give the exact fraction and percentage."
+  llm/vision:
+    kind: vision-shape
+    max_tokens: 128
+    prompt: "Identify the colored geometric shape. Answer in one short sentence."
+    fixture: tests/fixtures/red-square.png
+  retrieval/embedding:
+    kind: embedding-similarity
+    inputs: ["a domestic cat", "a small kitten", "database schema migration"]
+  retrieval/reranker:
+    kind: rerank
+    query: "AMD unified memory"
+    documents: ["A description of shared CPU and GPU memory on an AMD APU", "A recipe for apple pie"]
+  speech/kokoro:
+    kind: tts
+    text: "Local speech recognition test."
+    voice: alloy
+  speech/whisper-large-v3-turbo:
+    kind: transcription
+    fixture: tests/fixtures/local-speech-recognition-test.wav
+    expected_words: [local, speech, recognition, test]

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+# Run inside the built gateway image/container.
+help=$(llama-server --help 2>&1)
+required=(--host --port --model --ctx-size --parallel --n-gpu-layers --flash-attn --cache-type-k --cache-type-v --jinja --embedding --pooling --reranking --mmproj)
+for flag in "${required[@]}"; do
+  grep -Fq -- "$flag" <<<"$help" || { echo "UNSUPPORTED llama-server flag: $flag" >&2; exit 1; }
+done
+# Rendered configuration is mounted here; template/generator sources are checked on the host.
+if grep -R --line-number --fixed-strings -- '--no-mmap' /etc/llama-swap/config; then
+  echo 'ERROR: obsolete mmap-disable flag found in rendered configuration.' >&2
+  exit 1
+fi
+echo 'Runtime flags supported by this llama-server build.'

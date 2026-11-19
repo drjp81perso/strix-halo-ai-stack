@@ -1,0 +1,130 @@
+schema: 2
+registry_id: lab-2026.11
+as_of: 2026-11-19
+track: speculative-lab
+purpose: "Watchlist and risky experiments; entries may not run, fit, or have mature APIs"
+warning: "Never merge this file directly into the advertised llama-swap catalog."
+hardware_profile: { physical_ram_gib: 128, gpu_mappable_ceiling_gib: 96, normal_gpu_budget_gib: 90, protected_host_gib: 20 }
+status_vocabulary:
+  watch: "Official model exists; local path incomplete."
+  marginal: "Nominal quant nearly consumes the GPU mapping."
+  streamed: "Requires SSD/expert streaming or multiple nodes."
+  blocked: "Published complete artifact exceeds physical memory."
+models:
+  - id: lab/qwen38-flash-next
+    roles: [agent, reasoning, coding]
+    status: watch
+    source: Qwen/Qwen3.8-Flash-Next
+    architecture: "125B/6B-active plus large n-gram embeddings and MTP"
+    engine: experimental-llama.cpp-or-specialized-strix-halo-runtime
+    license: Qwen-Community-1.0
+    fit: architecture-dependent
+    confidence: medium
+    promotion_trigger: "Verified complete GGUF under 85 GiB with useful context and upstream runtime."
+  - id: lab/glm53-flash
+    roles: [reasoning, coding, vision-language]
+    status: marginal
+    source: zai-org/GLM-5.3-Flash
+    conversion: unsloth/GLM-5.3-Flash-GGUF
+    architecture: 320B/18B-active
+    smallest_reported_quant: IQ1_S
+    approximate_weights_gib: 93.1
+    engine: experimental-llama.cpp-or-Maya
+    license: MIT
+    fit: marginal-no-context-headroom
+    confidence: medium-low
+  - id: lab/deepseek-v41-flash
+    roles: [reasoning, coding, agent, vision-language]
+    status: streamed
+    source: deepseek-ai/DeepSeek-V4.1-Flash-1017
+    architecture: approximately-750B
+    smallest_conventional_quant_gib: 233
+    engine: specialized-SSD-expert-streaming-or-multinode
+    license: MIT
+    fit: not-resident
+    confidence: low-for-single-node
+  - id: lab/minimax-m31-flash
+    roles: [reasoning, text, image, video]
+    status: blocked
+    source: MiniMaxAI/MiniMax-M3.1-Flash
+    architecture: 428B/23B-active
+    smallest_reported_quant_gib: 129
+    engine: multinode-or-future-pruned-runtime
+    license: MiniMax-Community
+    fit: exceeds-physical-memory
+    confidence: high-that-it-does-not-fit-conventionally
+  - id: lab/kimi-k31-pro
+    roles: [reasoning, coding, agent]
+    status: blocked
+    source: moonshotai/Kimi-K3.1-Pro
+    architecture: 2.8T/104B-active
+    engine: multinode-only
+    license: custom
+    fit: no
+    confidence: high
+  - id: lab/fish-drama3
+    roles: [multi-speaker-tts, voice-cloning, audio-infilling]
+    status: watch
+    source: fishaudio/Drama-3
+    architecture: 35B-A3B
+    engine: pytorch-rocm-after-port
+    license: Fish-Audio-Community
+    fit: comfortable-in-capacity
+    confidence: low-medium-on-amd
+  - id: lab/mimo-audio-7b
+    roles: [audio-understanding, continuation, conversion, editing]
+    status: watch
+    source: XiaomiMiMo/MiMo-Audio-7B-Instruct
+    engine: cuda-first-pytorch; ROCm-port-required
+    license: verify-model-card
+    fit: comfortable-in-capacity
+    confidence: low-on-amd
+  - id: lab/yue2-3b
+    roles: [music-planning, covers, score-editing]
+    status: watch
+    source: m-a-p/YuE2-3B
+    engine: pytorch-rocm-experimental
+    license: CC-BY-NC-4.0-plus-creator-terms
+    fit: comfortable
+    confidence: medium-low
+  - id: lab/flux2-dev-32b
+    roles: [high-quality-image-generation, image-editing]
+    status: watch
+    source: black-forest-labs/FLUX.2-dev
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: BFL-non-commercial
+    fit: quantized-only
+    confidence: medium
+  - id: lab/glm-image
+    roles: [image-generation]
+    status: watch
+    source: zai-org/GLM-Image
+    architecture: "9B autoregressive + 7B diffusion"
+    engine: transformers-or-sglang-rocm-port
+    license: verify-model-card
+    fit: capacity-yes-compute-slow
+    confidence: medium-low
+  - id: lab/hunyuanimage3
+    roles: [image-generation, image-editing]
+    status: watch
+    source: tencent/HunyuanImage-3.0
+    architecture: 80B/13B-active
+    engine: quantized-rocm-port-required
+    fit: speculative-Q4
+    confidence: low
+  - id: lab/ltx25-dfr
+    roles: [high-fidelity-video, audio-video]
+    status: watch
+    source: Lightricks/LTX-2.5
+    engine: comfyui-rocm-with-fallback-kernels
+    license: LTX-2.x-Community
+    fit: tight
+    confidence: medium-low
+  - id: lab/wan22-s2v-14b
+    roles: [speech-to-video, character-animation]
+    status: watch
+    source: Wan-AI/Wan2.2-S2V-14B
+    engine: stable-diffusion.cpp-or-comfyui-rocm
+    license: Apache-2.0
+    fit: quantized-comfortable
+    confidence: medium

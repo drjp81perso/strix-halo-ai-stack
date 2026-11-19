@@ -1,0 +1,23 @@
+schema: 2
+registry_id: stable-2026.11
+as_of: 2026-11-19
+track: stable
+purpose: "Known-good or high-confidence day-one set for Strix Halo 128/96 GB"
+hardware_profile: { physical_ram_gib: 128, gpu_mappable_ceiling_gib: 96, normal_gpu_budget_gib: 90, protected_host_gib: 20 }
+policy:
+  advertise_only_promoted: true
+  require_exact_artifacts: true
+  require_clean_unload_test: true
+  max_one_heavyweight: true
+models:
+  - { id: llm/default, role: agent, status: promoted, source: unsloth/Qwen3.5-35B-A3B-GGUF, artifact: Qwen3.5-35B-A3B-Q5_K_M.gguf, engine: llama.cpp-vulkan, weights_gib: 26.2, license: Apache-2.0-base, confidence: high }
+  - { id: llm/reasoning, role: reasoning, status: promoted, source: unsloth/Qwen3.5-122B-A10B-GGUF, artifact_glob: 'Q4_K_M/*.gguf', engine: llama.cpp-vulkan, weights_gib: 76.5, license: Apache-2.0-base, confidence: high }
+  - { id: llm/coder, role: coding, status: promoted, source: Qwen/Qwen3-Coder-Next-GGUF, artifact_glob: 'Qwen3-Coder-Next-Q5_K_M/*.gguf', engine: llama.cpp-vulkan, weights_gib: 56.7, license: Apache-2.0, confidence: high }
+  - { id: llm/vision, role: vision-language, status: promoted, source: Qwen/Qwen3-VL-32B-Instruct-GGUF, engine: llama.cpp-vulkan, weights_gib: 22, license: Apache-2.0, confidence: high }
+  - { id: retrieval/embedding, role: embedding, status: promoted, source: Qwen/Qwen3-Embedding-4B-GGUF, artifact: Qwen3-Embedding-4B-Q8_0.gguf, engine: llama.cpp-vulkan, weights_gib: 4.3, license: Apache-2.0, confidence: high }
+  - { id: retrieval/reranker, role: reranking, status: promoted, source: Voodisss/Qwen3-Reranker-4B-GGUF-llama_cpp, artifact: Qwen3-Reranker-4B-Q4_K_M.gguf, engine: llama.cpp-vulkan, weights_gib: 2.5, license: Apache-2.0-base, confidence: medium }
+  - { id: speech/stt, role: speech-to-text, status: promoted, source: ggerganov/whisper.cpp, artifact: ggml-large-v3-turbo-q5_0.bin, engine: whisper.cpp-vulkan, weights_gib: 1.0, license: MIT, confidence: high }
+  - { id: speech/tts, role: text-to-speech, status: promoted, source: audio-cpp/audio.cpp-gguf, artifact: Kokoro-82M-GGUF/kokoro-82m-q8_0.gguf, engine: audio.cpp-cpu, weights_gib: 0.3, license: Apache-2.0, confidence: high }
+  - { id: image/default, role: image-generation-editing, status: candidate, source: black-forest-labs/FLUX.2-klein-4B, engine: stable-diffusion.cpp-vulkan, license: Apache-2.0, confidence: medium, promotion_blocker: exact-sd-server-artifact-set }
+  - { id: video/default, role: text-image-to-video, status: candidate, source: Wan-AI/Wan2.2-TI2V-5B, engine: comfyui-rocm, license: Apache-2.0, confidence: medium, promotion_blocker: pinned-workflow-adapter }
+  - { id: music/default, role: music-generation, status: candidate, source: ACE-Step/Ace-Step1.5, engine: acestep-rocm, license: MIT, confidence: medium, promotion_blocker: openai-adapter }

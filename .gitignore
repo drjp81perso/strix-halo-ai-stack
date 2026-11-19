@@ -1,0 +1,84 @@
+cat > .gitignore <<'EOF'
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+
+# Downloaded models and model caches
+models/*
+!models/.gitkeep
+**/.cache/
+.huggingface/
+huggingface/
+*.gguf
+*.safetensors
+*.bin
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Generated media
+outputs/*
+!outputs/.gitkeep
+
+# Runtime state and databases
+state/*
+!state/.gitkeep
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Benchmark results
+benchmark-results/*
+!benchmark-results/.gitkeep
+
+# Generated test media; keep deterministic static fixtures
+tests/fixtures/*.wav
+tests/fixtures/*.mp3
+tests/fixtures/*.flac
+tests/fixtures/*.ogg
+!tests/fixtures/red-square.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Downloaded bootstrap tools
+get-pip.py
+
+# Archives and packages
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+
+# Local benchmark/test artifacts
+/tmp/
+test-results/
+coverage/
+.coverage
+
+# IDE/editor state
+.vscode/
+.idea/
+EOF

@@ -1,0 +1,12 @@
+schema: 1
+llama_server:
+  # Flags removed by current llama.cpp and forbidden in generated commands.
+  forbidden_flags:
+    - --no-mmap
+  # Current replacement when mmap must explicitly be disabled. Do not apply by default.
+  mmap_disabled_equivalent: [--load-mode, none]
+  default_load_mode: auto
+  required_flags:
+    - --host
+    - --port
+    - --model
