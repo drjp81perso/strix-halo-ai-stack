@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd);cd "$ROOT"
+[[ -f .env ]]||{ echo '.env is required' >&2;exit 2; };set -a;source .env;set +a
+BASE="http://${AI_BIND:-127.0.0.1}:${AI_PORT:-9292}";[[ "$BASE" == http://0.0.0.0:* ]]&&BASE="http://127.0.0.1:${AI_PORT:-9292}"
+KEY=${AI_API_KEY:?AI_API_KEY missing};suite=${1:-smoke};run_id=$(date +%Y%m%d-%H%M%S);dir="benchmark-results/protocol-$run_id";mkdir -p "$dir"
+# Protocol settings can be overridden by environment for CI/tuning.
+export PROTOCOL_UNLOAD_WAIT_SECONDS="${PROTOCOL_UNLOAD_WAIT_SECONDS:-4}"
+export PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB="${PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB:-2.0}"
+export PROTOCOL_MAX_HTTP_429="${PROTOCOL_MAX_HTTP_429:-0}"
+status=pass; tests=0; passed=0; failed=0
+run(){ local name=$1;shift;tests=$((tests+1));echo "===== $name =====";if "$@" >"$dir/$name.log" 2>&1;then passed=$((passed+1));echo PASS;else failed=$((failed+1));status=fail;echo FAIL;tail -60 "$dir/$name.log";fi; }
+case "$suite" in
+ static)
+  run environment ./scripts/test-environment
+  run static ./scripts/validate
+  run coverage ./scripts/test-coverage --strict;;
+ smoke)
+  run environment ./scripts/test-environment
+  run static ./scripts/validate
+  run health curl -fsS "$BASE/health"
+  run auth-denied bash -c 'code=$(curl -sS -o /dev/null -w "%{http_code}" '"$BASE"'/v1/models);[[ "$code" == 401 ]]'
+  run discovery curl -fsS -H "Authorization: Bearer $KEY" "$BASE/v1/models"
+  run fast python3 tests/run.py llm/fast --base "$BASE" --key "$KEY";;
+ active)
+  run environment ./scripts/test-environment
+  run static ./scripts/validate
+  while read -r model;do run "${model//\//__}" python3 tests/run.py "$model" --base "$BASE" --key "$KEY";done < <(python3 - <<'PY'
+import yaml
+x=yaml.safe_load(open('tests/protocol.yaml'));print(*x['suites']['active']['models'],sep='\n')
+PY
+);;
+ exposed)
+  run environment ./scripts/test-environment
+  run static ./scripts/validate
+  run exposed python3 tests/exposed.py --base "$BASE" --key "$KEY" --output "$dir/exposed.json";;
+ openwebui)
+  run environment ./scripts/test-environment
+  run static ./scripts/validate
+  run burst python3 tests/openwebui_burst.py --base "$BASE" --key "$KEY" --output "$dir/burst.json";;
+ full)
+  "$0" static;"$0" smoke;"$0" exposed;"$0" openwebui;exit;;
+ soak)
+  for i in 1 2 3;do run "active-$i" "$0" active;done;;
+ *) echo 'Usage: ./scripts/test-protocol {static|smoke|active|exposed|openwebui|full|soak}' >&2;exit 2;;esac
+python3 - "$suite" "$run_id" "$status" "$tests" "$passed" "$failed" "$dir" <<'PY'
+import json,sys,pathlib
+suite,run,status,tests,passed,failed,out=sys.argv[1:]
+import os
+d={'suite':suite,'run_id':run,'status':status,'tests':int(tests),'passed':int(passed),'failed':int(failed),'effective_policy':{k:('***' if k=='AI_API_KEY' else os.environ.get(k)) for k in ['AI_API_KEY','HEAVY_HOST_RESERVE_GB','LIGHT_HOST_RESERVE_GB','HEAVY_MAX_CURRENT_GTT_GB','LIGHT_MAX_CURRENT_GTT_GB','TTS_MAX_CURRENT_GTT_GB','GPU_FIT_TARGET_MIB','MIN_FIT_CONTEXT','GLOBAL_CONCURRENCY_LIMIT','PROTOCOL_UNLOAD_WAIT_SECONDS','PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB','PROTOCOL_MAX_HTTP_429']}};pathlib.Path(out,'summary.json').write_text(json.dumps(d,indent=2));print(json.dumps(d,indent=2))
+PY
+[[ "$status" == pass ]]

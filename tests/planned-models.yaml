@@ -1,0 +1,68 @@
+schema: 1
+# Promotion tests for canonical candidates. These are specifications, not executable
+# until the named runtime/adapter is registered in llama-swap.
+planned_tests:
+  speech/qwen3-asr-0.6b:
+    kind: transcription-multilingual-streaming
+    fixtures: [en-short.wav, fr-short.wav, song-vocal-short.wav]
+    assertions: [keyword-accuracy, first-partial-latency, realtime-factor, unload-to-baseline]
+  speech/moss-transcribe-diarize-0.9b:
+    kind: transcription-diarization
+    fixtures: [two-speaker-60s.wav, long-form-10m.wav]
+    assertions: [word-error-rate, timestamp-monotonicity, speaker-turn-f1, event-tags, unload-to-baseline]
+  speech/moss-tts-nano-100m:
+    kind: tts-cloning
+    fixtures: [authorized-reference.wav]
+    assertions: [valid-wav, first-audio-latency, realtime-factor, long-text-stability, clone-similarity, consent-boundary]
+  speech/qwen3-tts-0.6b-base:
+    kind: streaming-tts-cloning
+    fixtures: [authorized-reference.wav]
+    assertions: [valid-stream, first-audio-latency, multilingual-text, clone-similarity, named-voice-enumeration, unload-to-baseline]
+  music/ace-step-15-xl-turbo:
+    kind: music-generation-editing
+    fixtures: [reference-loop.wav]
+    assertions: [30s-output, 2m-output, bpm-tolerance, duration-tolerance, cover-mode, repaint-mode, cancellation, persistent-output]
+  speech/qwen3-asr-1.7b-aligner:
+    kind: transcription-forced-alignment
+    fixtures: [known-transcript.wav]
+    assertions: [word-error-rate, alignment-boundary-error, multilingual, unload-to-baseline]
+  speech/qwen3-tts-1.7b-suite:
+    kind: advanced-tts-suite
+    fixtures: [authorized-reference.wav]
+    assertions: [base-clone, custom-voice, voice-design, streaming, multilingual, enrollment-authentication, unload-to-baseline]
+  speech/fish-drama3:
+    kind: multi-character-tts
+    fixtures: [authorized-speaker-a.wav, authorized-speaker-b.wav]
+    assertions: [speaker-separation, dialogue-order, clone-similarity, infill-boundaries, license-accepted, unload-to-baseline]
+  audio/mimo-audio-7b-instruct:
+    kind: audio-understanding-editing
+    fixtures: [speech.wav, music.wav, noisy-speech.wav]
+    assertions: [caption-keywords, continuation-decodes, style-conversion, edit-locality, rocm-no-cuda-dependency, unload-to-baseline]
+  music/yue2-3b:
+    kind: planned-music-generation
+    fixtures: [reference-song.wav, score.abc]
+    assertions: [score-conditioning, cover-mode, regeneration-after-edit, duration-tolerance, license-reviewed, persistent-output]
+  music/heartmula-3b:
+    kind: lyrics-conditioned-song
+    fixtures: [lyrics.txt]
+    assertions: [valid-48khz-stereo, lyrics-presence, duration-tolerance, cancellation, unload-to-baseline]
+  speech/chatterbox-clone:
+    kind: voice-cloning
+    fixtures: [authorized-reference.wav]
+    assertions: [clone-similarity, multilingual, watermark-policy, enrollment-authentication, consent-boundary]
+  image/flux2-klein:
+    kind: image-generation-editing
+    fixtures: [reference-image.png]
+    assertions: [png-decodes, dimensions, prompt-object-color, reference-edit, seed-repeatability, unload-to-baseline]
+  image/z-image-turbo:
+    kind: fast-image-generation
+    fixtures: []
+    assertions: [png-decodes, dimensions, typography-ocr, photorealism-smoke, seed-repeatability, unload-to-baseline]
+  video/wan22-5b:
+    kind: video-generation
+    fixtures: [reference-image.png]
+    assertions: [ffprobe-decodes, frame-count, duration-tolerance, dimensions, image-conditioning, cancellation, persistent-output, unload-to-baseline]
+  music/ace-step-xl:
+    kind: music-generation-adapter
+    fixtures: [reference-loop.wav]
+    assertions: [openai-adapter-contract, async-job-state, valid-audio, duration-tolerance, persistent-output, unload-to-baseline]

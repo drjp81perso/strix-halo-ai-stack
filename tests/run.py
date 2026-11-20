@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import argparse,base64,json,math,re,struct,subprocess,sys,time,urllib.request,urllib.error,wave,yaml
+import argparse,base64,json,math,os,re,struct,subprocess,sys,time,urllib.request,urllib.error,wave,yaml
 ROOT=Path(__file__).resolve().parents[1]
 def plain(s):
  s=re.sub(r'\\(?:d|t)?frac\s*\{\s*([^{}]+?)\s*\}\s*\{\s*([^{}]+?)\s*\}',lambda m:f'{m.group(1).strip()}/{m.group(2).strip()}',s)
@@ -20,7 +20,7 @@ def metrics(base,key):
     try:out[line.split('{')[0].split()[0]]=float(line.rsplit(' ',1)[1])
     except ValueError:pass
  return out
-def unload(base,key): request(base,key,'/api/models/unload',method='POST'); time.sleep(2)
+def unload(base,key): request(base,key,'/api/models/unload',method='POST'); time.sleep(float(os.environ.get('PROTOCOL_UNLOAD_WAIT_SECONDS','4')))
 def chat(base,key,mid,spec):
  content=spec['prompt']
  if 'fixture' in spec:
@@ -48,5 +48,5 @@ def main():
   st,b,_=request(a.base,a.key,'/v1/audio/speech',{'model':a.model,'input':spec['text'],'voice':spec['voice']}); out=ROOT/'tests/fixtures/local-speech-recognition-test.wav'; out.write_bytes(b); assert st==200 and b[:4]==b'RIFF'; w=wave.open(str(out)); frames=w.readframes(w.getnframes()); assert w.getnframes()/w.getframerate()>.3; width=w.getsampwidth(); assert width in (1,2,4); fmt={1:'b',2:'h',4:'i'}[width]; count=len(frames)//width; vals=struct.unpack('<'+fmt*count,frames); assert math.sqrt(sum(v*v for v in vals)/max(1,count))>10; data={'fixture':str(out),'seconds':w.getnframes()/w.getframerate()}
  elif kind=='transcription':
   fixture=ROOT/spec['fixture']; assert fixture.exists(),'Run speech/kokoro test first'; cmd=['curl','-fsS','-H',f'Authorization: Bearer {a.key}',a.base+'/v1/audio/transcriptions','-F',f'model={a.model}','-F',f'file=@{fixture}']; q=subprocess.run(cmd,capture_output=True,check=True); st=200; data=json.loads(q.stdout); text=re.sub(r'[^a-z ]',' ',(data.get('text') or '').lower()); assert all(word in text for word in spec['expected_words'])
- elapsed=time.monotonic()-start; loaded=metrics(a.base,a.key); _,running,_=request(a.base,a.key,'/running'); unload(a.base,a.key); _,after,_=request(a.base,a.key,'/running'); assert not json.loads(after)['running']; result={'model':a.model,'kind':kind,'status':st,'passed':True,'wall_seconds':round(elapsed,3),'before':before,'loaded':loaded,'running_loaded':json.loads(running),'running_after':json.loads(after),'response':data}; out=ROOT/'benchmark-results'/f"{a.model.replace('/','__')}-{time.strftime('%Y%m%d-%H%M%S')}.json"; out.parent.mkdir(exist_ok=True); out.write_text(json.dumps(result,indent=2)); print(json.dumps({k:v for k,v in result.items() if k!='response'},indent=2)); print('PASS',a.model,'result:',out)
+ elapsed=time.monotonic()-start; loaded=metrics(a.base,a.key); _,running,_=request(a.base,a.key,'/running'); unload(a.base,a.key); _,after,_=request(a.base,a.key,'/running'); assert not json.loads(after)['running']; result={'model':a.model,'kind':kind,'status':st,'passed':True,'wall_seconds':round(elapsed,3),'before':before,'loaded':loaded,'running_loaded':json.loads(running),'running_after':json.loads(after),'effective_policy':{k:os.environ.get(k) for k in ('HEAVY_HOST_RESERVE_GB','LIGHT_HOST_RESERVE_GB','GPU_FIT_TARGET_MIB','MIN_FIT_CONTEXT','GLOBAL_CONCURRENCY_LIMIT','PROTOCOL_UNLOAD_WAIT_SECONDS','PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB')},'response':data}; out=ROOT/'benchmark-results'/f"{a.model.replace('/','__')}-{time.strftime('%Y%m%d-%H%M%S')}.json"; out.parent.mkdir(exist_ok=True); out.write_text(json.dumps(result,indent=2)); print(json.dumps({k:v for k,v in result.items() if k!='response'},indent=2)); print('PASS',a.model,'result:',out)
 if __name__=='__main__':main()

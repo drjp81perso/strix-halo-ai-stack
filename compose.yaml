@@ -21,8 +21,14 @@ services:
       LLAMA_SWAP_LISTEN: 0.0.0.0:8080
       LLAMA_SWAP_WATCH_CONFIG: "true"
       AI_API_KEY: "${AI_API_KEY}"
-      MIN_HOST_AVAILABLE_GB: "${MIN_HOST_AVAILABLE_GB:-20}"
-      MAX_GTT_USED_GB: "${MAX_GTT_USED_GB:-92}"
+      HEAVY_HOST_RESERVE_GB: "${HEAVY_HOST_RESERVE_GB:-20}"
+      LIGHT_HOST_RESERVE_GB: "${LIGHT_HOST_RESERVE_GB:-16}"
+      HEAVY_MAX_CURRENT_GTT_GB: "${HEAVY_MAX_CURRENT_GTT_GB:-4}"
+      LIGHT_MAX_CURRENT_GTT_GB: "${LIGHT_MAX_CURRENT_GTT_GB:-8}"
+      TTS_MAX_CURRENT_GTT_GB: "${TTS_MAX_CURRENT_GTT_GB:-12}"
+      GPU_FIT_TARGET_MIB: "${GPU_FIT_TARGET_MIB:-4096}"
+      MIN_FIT_CONTEXT: "${MIN_FIT_CONTEXT:-16384}"
+      GLOBAL_CONCURRENCY_LIMIT: "${GLOBAL_CONCURRENCY_LIMIT:-4}"
     volumes:
       - ./config/llama-swap.yaml:/etc/llama-swap/config/config.yaml:ro
       - ./config/audiocpp.json:/etc/llama-swap/audiocpp.json:ro
@@ -41,6 +47,7 @@ services:
   media:
     image: caddy:2.10-alpine
     container_name: strix-halo-media
+    privileged: true
     restart: unless-stopped
     command: ["caddy", "file-server", "--root", "/srv", "--listen", ":8080"]
     volumes:

@@ -10,6 +10,24 @@ for f in files:
     print('YAML OK',f)
 PY
 python3 -m json.tool config/audiocpp.json >/dev/null && echo 'JSON OK config/audiocpp.json'
+python3 - <<'PY'
+from pathlib import Path
+import yaml
+registry=yaml.safe_load(Path('registry/models.yaml').read_text())['models']
+active=yaml.safe_load(Path('tests/models.yaml').read_text())['tests']
+planned=yaml.safe_load(Path('tests/planned-models.yaml').read_text())['planned_tests']
+ids=[m['id'] for m in registry]
+assert len(ids)==len(set(ids)), 'duplicate canonical model IDs'
+for model in registry:
+    mid=model['id']
+    if model.get('enabled'):
+        assert mid in active, f'active model missing executable test: {mid}'
+        assert model.get('test_status')=='implemented', mid
+    else:
+        assert mid in planned, f'candidate missing planned test: {mid}'
+        assert model.get('test_status')=='planned', mid
+print(f'ROSTER/TEST COVERAGE OK active={len(active)} planned={len(planned)}')
+PY
 ./scripts/generate-config --check
 # Scan every source that can regenerate or document commands, not only rendered config.
 if grep -R --line-number --fixed-strings --exclude=runtime-policy.yaml -- '--no-mmap' \

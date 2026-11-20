@@ -21,6 +21,21 @@ say VIDEO_GID "${video:-not-found}"; say RENDER_GID "${render:-not-found}"
 if [[ -f .env ]]; then
   say ENV_FILE OK
   set -a; source .env; set +a
+  # Backward compatibility for early reference-profile .env files.
+  : "${HEAVY_HOST_RESERVE_GB:=${MIN_HOST_AVAILABLE_GB:-20}}"
+  : "${LIGHT_HOST_RESERVE_GB:=16}"
+  : "${HEAVY_MAX_CURRENT_GTT_GB:=4}"
+  : "${LIGHT_MAX_CURRENT_GTT_GB:=8}"
+  : "${TTS_MAX_CURRENT_GTT_GB:=12}"
+  : "${GPU_FIT_TARGET_MIB:=4096}"
+  : "${MIN_FIT_CONTEXT:=16384}"
+  : "${GLOBAL_CONCURRENCY_LIMIT:=4}"
+  for value in HEAVY_HOST_RESERVE_GB LIGHT_HOST_RESERVE_GB HEAVY_MAX_CURRENT_GTT_GB LIGHT_MAX_CURRENT_GTT_GB TTS_MAX_CURRENT_GTT_GB GPU_FIT_TARGET_MIB MIN_FIT_CONTEXT GLOBAL_CONCURRENCY_LIMIT; do
+    [[ "${!value}" =~ ^[0-9]+$ ]] || { say "$value" "INVALID: ${!value}"; fail=1; }
+  done
+  say HEAVY_RESERVE "${HEAVY_HOST_RESERVE_GB} GiB host, ${HEAVY_MAX_CURRENT_GTT_GB} GiB current GTT"
+  say FIT_POLICY "${GPU_FIT_TARGET_MIB} MiB device reserve, ${MIN_FIT_CONTEXT} min context"
+  say CONCURRENCY "${GLOBAL_CONCURRENCY_LIMIT} gateway requests; model slots remain configured per model"
   model_dir=${MODEL_DIR:-$ROOT/models}
   if [[ -d "$model_dir" && -r "$model_dir" ]]; then
     say MODEL_DIR "$model_dir"

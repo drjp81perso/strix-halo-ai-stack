@@ -20,6 +20,16 @@ Every test enforces a lifecycle: unload all, baseline metrics, cold request, sem
 
 `test-all` is sequential and orders Kokoro before Whisper.
 
+## Candidate coverage
+
+Candidates that are not yet runnable still require a concrete promotion test in `tests/planned-models.yaml`. This includes multilingual/diarization STT, cloning TTS, music generation/editing, image generation/editing, video generation, and adapter contracts. Use:
+
+```bash
+./scripts/ai-stack roster
+```
+
+Validation fails when an active model lacks an executable test or a canonical candidate lacks a planned test. See `docs/MODEL-ROSTER.md` for the full matrix.
+
 ## Staged multimedia promotion tests
 
 Image/video/music/voice adapters must also verify decodable persistent output, requested dimensions/duration, cancellation, reproducibility where promised, output survival after unload, and authenticated consent-controlled voice enrollment.

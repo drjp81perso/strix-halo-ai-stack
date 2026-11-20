@@ -1,6 +1,20 @@
-# Strix Halo Local AI Stack
+# On-Demand Local AI Stack
 
-Concrete Docker bundle for a **Bosgame M5 / Ryzen AI Max+ 395 / 128 GB RAM / Ubuntu** host configured for at most approximately **96 GB GPU-mappable shared memory**.
+Docker-based, OpenAI-compatible model catalog with automatic loading/unloading, memory admission, and semantic tests. It can be adapted to discrete GPUs, unified-memory APUs, or CPU-only hosts.
+
+The checked-in roster is a validated **reference profile** for a Bosgame M5 / Ryzen AI Max+ 395 / 128 GB Ubuntu system. Start with:
+
+- `docs/CUSTOMIZING.md` — generic sizing formulas, common RAM/VRAM tables, backend choices, and adaptation checklist
+- `docs/HARDWARE-PROFILES.md` — practical 8/12/16/24/48 GB discrete and 32/64/128 GB unified examples
+- `profiles/` — apply-ready memory-policy starting points
+- `docs/REFERENCE-STRIX-HALO.md` — decisions specific to the validated reference system
+- `docs/ARCHITECTURE.md` — control and execution planes
+- `docs/OPERATIONS.md` — measured behavior and troubleshooting
+- `docs/OPEN-WEBUI.md` — connection setup, audio/RAG wiring, concurrency and 429 troubleshooting
+- `docs/MODEL-ROSTER.md` — canonical active/balanced/experimental/staged roster
+- `docs/TESTING.md` — executable tests and candidate promotion contracts
+- `docs/AUTOMATED-TEST-PROTOCOL.md` — static, smoke, active, exposed, Open WebUI, full, and soak suites
+- `docs/EXPOSED-MODEL-TEST.md` — prove every canonical model listed by live `/v1/models` works
 
 ## What is operational on day one
 
@@ -29,19 +43,11 @@ Video, advanced images, music, and voice cloning are deliberately recorded as **
 
 ## Memory policy
 
-The machine has one 128 GB physical pool. The 96 GB GPU mapping is not additional RAM.
+Memory thresholds are configured in `.env`, interpreted as **pre-start safety reserves**, and documented in `docs/CUSTOMIZING.md`. The checked-in defaults preserve the validated reference behavior: 20 GiB host reserve for heavy models, 16 GiB for light models, automatic llama.cpp fitting, and one heavyweight model at a time.
 
-- Protect at least 20 GB of host memory.
-- Target no more than about 90 GB normal GTT/GPU use.
-- Run one heavyweight LLM at a time.
-- Embedding/reranking and speech groups may coexist where declared.
-- `admit-run` checks host `MemAvailable` and current AMD GTT use before every cold start.
-- Model processes are children of llama-swap; switching groups sends termination to the old server before starting the new one.
-- TTL automatically unloads inactive models.
-- No Docker socket is mounted.
-- No inference workload is intended to use disk swap.
+On unified-memory systems, mapped GPU memory is part of physical RAM—not additional capacity. On discrete systems, RAM and VRAM are separate constraints. In both cases, measure cold-load peaks and unloading before promoting a model.
 
-The supplied thresholds are conservative admission checks, not perfect forecasts. Benchmark peaks and adjust after observing the actual host.
+Model processes are children of llama-swap; group switching and TTL terminate old servers. No Docker socket is mounted and inference should not depend on disk swap.
 
 ## 1. Prerequisites
 
@@ -59,7 +65,7 @@ ls -l /dev/dri
 cat /sys/class/drm/card*/device/mem_info_gtt_total
 ```
 
-Use a kernel/ROCm combination supported for Strix Halo. The bundle itself uses Vulkan and does not require ROCm for the enabled catalog.
+Use a kernel and driver supported by your hardware. The reference image uses Vulkan; CUDA, ROCm, SYCL, Metal, and CPU-only deployments require the corresponding engine image or native runtime. See `docs/CUSTOMIZING.md`.
 
 ## 2. Configure
 
@@ -75,6 +81,15 @@ getent group render
 ```
 
 Put the numeric values into `VIDEO_GID` and `RENDER_GID`.
+
+Choose memory-policy values using `docs/CUSTOMIZING.md` or apply a starting profile:
+
+```bash
+./scripts/apply-profile profiles/discrete-24gb.env
+# or: profiles/unified-32gb.env, unified-64gb.env, unified-128gb.env
+```
+
+The command backs up `.env`, changes safety/fitting thresholds, regenerates, and validates. It does not change the model roster. The `.env.example` defaults match the 128 GB reference system; smaller hosts must select smaller model artifacts and update the model template.
 
 Set the host model library in `.env`. For example:
 
@@ -196,9 +211,13 @@ Use the wrapper for normal operations:
 ./scripts/ai-stack --help
 ./scripts/ai-stack status
 ./scripts/ai-stack models
+./scripts/ai-stack roster
 ./scripts/ai-stack config
 ./scripts/ai-stack test llm/fast
 ./scripts/ai-stack test-all
+./scripts/ai-stack protocol exposed
+./scripts/ai-stack protocol openwebui
+./scripts/ai-stack protocol full
 ./scripts/ai-stack unload
 ./scripts/ai-stack ui
 ```

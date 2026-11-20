@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
+profile=${1:?Usage: ./scripts/apply-profile profiles/FILE.env}
+[[ -f "$profile" ]] || { echo "Profile not found: $profile" >&2; exit 1; }
+[[ -f .env ]] || cp .env.example .env
+cp -a .env ".env.backup.$(date +%Y%m%d-%H%M%S)"
+keys='HEAVY_HOST_RESERVE_GB LIGHT_HOST_RESERVE_GB HEAVY_MAX_CURRENT_GTT_GB LIGHT_MAX_CURRENT_GTT_GB TTS_MAX_CURRENT_GTT_GB GPU_FIT_TARGET_MIB MIN_FIT_CONTEXT GLOBAL_CONCURRENCY_LIMIT'
+for key in $keys; do
+  value=$(sed -n "s/^${key}=//p" "$profile" | tail -1)
+  [[ -n "$value" ]] || { echo "Missing $key in $profile" >&2; exit 1; }
+  if grep -q "^${key}=" .env; then sed -i "s/^${key}=.*/${key}=${value}/" .env; else echo "${key}=${value}" >> .env; fi
+done
+./scripts/preflight
+./scripts/generate-config
+./scripts/validate
+echo "Applied $profile. Model roster was not changed."

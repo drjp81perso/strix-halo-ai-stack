@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+python3 - "$ROOT" "$@" <<'PY'
+from pathlib import Path
+import argparse,sys,yaml
+root=Path(sys.argv[1]); p=argparse.ArgumentParser(); p.add_argument('--strict',action='store_true'); a=p.parse_args(sys.argv[2:])
+r=yaml.safe_load((root/'registry/models.yaml').read_text())['models']
+active=yaml.safe_load((root/'tests/models.yaml').read_text())['tests']
+planned=yaml.safe_load((root/'tests/planned-models.yaml').read_text())['planned_tests']
+missing=[]
+print(f"{'MODEL':<38} {'TRACK':<13} {'STATE':<11} TEST")
+for m in r:
+ mid=m['id']; enabled=m.get('enabled',False); track=m.get('track',m.get('registry_track','staged'))
+ if enabled and mid in active: status='executable'; test=active[mid]['kind']
+ elif not enabled and mid in planned: status='planned'; test=planned[mid]['kind']
+ else: status='MISSING'; test='-'; missing.append(mid)
+ print(f"{mid:<38} {track:<13} {status:<11} {test}")
+print(f"\nActive executable: {sum(m.get('enabled',False) and m['id'] in active for m in r)}")
+print(f"Candidate planned: {sum(not m.get('enabled',False) and m['id'] in planned for m in r)}")
+print(f"Missing coverage: {len(missing)}")
+if missing or (a.strict and any(m.get('enabled',False) and m['id'] not in active for m in r)): raise SystemExit(1)
+PY

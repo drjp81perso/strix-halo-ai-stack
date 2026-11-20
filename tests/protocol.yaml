@@ -1,0 +1,38 @@
+schema: 1
+protocol_id: local-ai-acceptance-v1
+policies:
+  require_empty_running_before_test: true
+  unload_after_each_test: true
+  unload_wait_seconds: 4
+  memory_return_tolerance_gib: 2.0
+  max_http_429_active_suite: 0
+  archive_raw_responses: true
+suites:
+  static:
+    description: Config, template, roster, artifact and test-coverage checks; no running API required.
+  smoke:
+    description: Health, authentication, model discovery, exact fast-chat response and unload.
+    models: [llm/fast]
+  active:
+    description: Every active model, sequentially, with semantic and lifecycle assertions.
+    models:
+      - llm/fast
+      - llm/coder
+      - llm/reasoning
+      - llm/vision
+      - retrieval/embedding
+      - retrieval/reranker
+      - speech/kokoro
+      - speech/whisper-large-v3-turbo
+  exposed:
+    description: Dynamically discover /v1/models and functionally test every advertised canonical model; validate aliases without duplicate inference.
+  openwebui:
+    description: Cold-load burst that emulates a user chat plus Open WebUI background request.
+    model: llm/coder
+    foreground_prompt: "Return exactly: coder foreground ready"
+    background_prompt: "Create a short chat title of at most four words for a coding conversation."
+    start_delay_seconds: 0.15
+    allowed_statuses: [200]
+  soak:
+    description: Repeat active suite to expose memory leaks and lifecycle races.
+    repeats: 3

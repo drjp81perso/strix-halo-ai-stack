@@ -1,47 +1,53 @@
-schema: 1
+schema: 2
 hardware_profile:
   physical_ram_gib: 128
   gpu_mappable_ceiling_gib: 96
   normal_gpu_budget_gib: 90
   protected_host_gib: 20
-  host_model_root: "${MODEL_DIR from .env; mounted as /models}"
-
-# enabled=true means the supplied llama-swap config exposes it immediately.
-# staged entries require the runtime/adapter described in docs/STAGED-MULTIMEDIA.md.
+  host_model_root: ${MODEL_DIR from .env; mounted as /models}
 models:
   - id: llm/fast
     enabled: true
     role: fast-agent
     engine: llama.cpp-vulkan
     source: unsloth/Qwen3.5-35B-A3B-GGUF
-    files: [Qwen3.5-35B-A3B-Q5_K_M.gguf]
+    files:
+      - Qwen3.5-35B-A3B-Q5_K_M.gguf
     local_dir: models/llm/qwen35
     license: Apache-2.0-base-model
     approximate_weight_gib: 26.2
     ttl_seconds: 1800
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: llm/reasoning
     enabled: true
     role: strong-reasoning
     engine: llama.cpp-vulkan
     source: unsloth/Qwen3.5-122B-A10B-GGUF
-    include: [Q4_K_M/*.gguf]
+    include:
+      - Q4_K_M/*.gguf
     local_dir: models/llm/qwen122
     license: Apache-2.0-base-model
     approximate_weight_gib: 76.5
     ttl_seconds: 600
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: llm/coder
     enabled: true
     role: coding-agent
     engine: llama.cpp-vulkan
     source: Qwen/Qwen3-Coder-Next-GGUF
-    include: [Qwen3-Coder-Next-Q5_K_M/*.gguf]
+    include:
+      - Qwen3-Coder-Next-Q5_K_M/*.gguf
     local_dir: models/llm/coder
     license: Apache-2.0
     approximate_weight_gib: 56.7
     ttl_seconds: 900
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: llm/vision
     enabled: true
     role: vision-language
@@ -54,56 +60,66 @@ models:
     license: Apache-2.0
     approximate_weight_gib: 22
     ttl_seconds: 900
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: retrieval/embedding
     enabled: true
     role: embedding
     engine: llama.cpp-vulkan
     source: Qwen/Qwen3-Embedding-4B-GGUF
-    files: [Qwen3-Embedding-4B-Q8_0.gguf]
+    files:
+      - Qwen3-Embedding-4B-Q8_0.gguf
     local_dir: models/retrieval
     license: Apache-2.0
     approximate_weight_gib: 4.3
     ttl_seconds: 1800
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: retrieval/reranker
     enabled: true
     role: reranker
     engine: llama.cpp-vulkan
     source: Voodisss/Qwen3-Reranker-4B-GGUF-llama_cpp
-    files: [Qwen3-Reranker-4B-Q4_K_M.gguf]
+    files:
+      - Qwen3-Reranker-4B-Q4_K_M.gguf
     local_dir: models/retrieval
     license: Apache-2.0-base-model
     approximate_weight_gib: 2.5
     ttl_seconds: 1800
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: speech/whisper-large-v3-turbo
     enabled: true
     role: speech-to-text
     engine: whisper.cpp-vulkan
     source: ggerganov/whisper.cpp
-    files: [ggml-large-v3-turbo-q5_0.bin]
+    files:
+      - ggml-large-v3-turbo-q5_0.bin
     local_dir: models/speech/whisper
     license: MIT
     approximate_weight_gib: 1.0
     ttl_seconds: 1800
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: speech/kokoro
     enabled: true
     role: text-to-speech
     engine: audio.cpp-cpu
     source: audio-cpp/audio.cpp-gguf
-    files: [Kokoro-82M-GGUF/kokoro-82m-q8_0.gguf]
+    files:
+      - Kokoro-82M-GGUF/kokoro-82m-q8_0.gguf
     local_dir: models/speech/kokoro
     flatten: true
     license: Apache-2.0
     approximate_weight_gib: 0.3
     ttl_seconds: 1800
-
-  # Curated speech/audio registry v2026.11.19.
-  # "balanced" favors permissive licensing, native/portable runtimes, and simple APIs.
-  # "experimental" favors frontier capability where gfx1151/runtime validation is incomplete.
-
+    track: active
+    lifecycle: executable
+    test_status: implemented
   - id: speech/qwen3-asr-0.6b
     enabled: false
     registry_track: balanced
@@ -119,7 +135,10 @@ models:
     api: OpenAI-compatible-/v1/audio/transcriptions-via-audio.cpp
     amd_support: native-audio.cpp-HIP/Vulkan-port; gfx1151 must be smoke-tested
     confidence: high-model; medium-amd
-
+    track: balanced
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: speech/moss-transcribe-diarize-0.9b
     enabled: false
     registry_track: balanced
@@ -135,7 +154,10 @@ models:
     api: OpenAI-compatible-/v1/audio/transcriptions
     amd_support: audio.cpp lists GGUF BF16/Q8/Q4 and streaming; HIP/Vulkan validation required
     confidence: high-model; medium-amd
-
+    track: balanced
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: speech/moss-tts-nano-100m
     enabled: false
     registry_track: balanced
@@ -153,7 +175,10 @@ models:
     api: local-CLI/FastAPI; OpenAI-/v1/audio/speech-via-vLLM-Omni-or-adapter
     amd_support: CPU-safe; audio.cpp HIP/Vulkan alternative available
     confidence: high
-
+    track: balanced
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: adapter-and-quality-validation-required
   - id: speech/qwen3-tts-0.6b-base
     enabled: false
     registry_track: balanced
@@ -169,7 +194,10 @@ models:
     api: OpenAI-compatible-/v1/audio/speech-via-audio.cpp
     amd_support: audio.cpp lists GGUF 16/Q8 streaming and LoRA; gfx1151 validation required
     confidence: high-model; medium-amd
-
+    track: balanced
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: music/ace-step-15-xl-turbo
     enabled: false
     registry_track: balanced
@@ -185,7 +213,10 @@ models:
     api: official-REST-API-and-Gradio; typed-Open-WebUI-tool-recommended
     amd_support: official ROCm requirements/scripts; gfx1151 benchmark still required
     confidence: high-model; medium-high-amd
-
+    track: balanced
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: rocm-adapter-benchmark-required
   - id: speech/qwen3-asr-1.7b-aligner
     enabled: false
     registry_track: experimental
@@ -203,7 +234,10 @@ models:
     api: OpenAI-compatible-transcription plus alignment route via audio.cpp
     amd_support: native GGUF ports listed; gfx1151 validation required
     confidence: high-model; medium-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: speech/qwen3-tts-1.7b-suite
     enabled: false
     registry_track: experimental
@@ -222,7 +256,10 @@ models:
     api: OpenAI-compatible-/v1/audio/speech-via-audio.cpp
     amd_support: native GGUF ports listed; test streaming, clone enrollment, and unloading
     confidence: high-model; medium-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: speech/fish-drama3
     enabled: false
     registry_track: experimental
@@ -236,7 +273,10 @@ models:
     api: official-CLI/API; OpenAI-compatible speech through audio.cpp
     amd_support: audio.cpp mixed-Q2/Q3/Q4/IQ3 port with stream; gfx1151 unverified
     confidence: medium-high-model; medium-low-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: license-and-audiocpp-validation-required
   - id: audio/mimo-audio-7b-instruct
     enabled: false
     registry_track: experimental
@@ -254,7 +294,10 @@ models:
     api: Python-and-Gradio; adapter-required
     amd_support: upstream CUDA/FlashAttention only; ROCm substitution is unproven
     confidence: high-model; low-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: rocm-port-required
   - id: music/yue2-3b
     enabled: false
     registry_track: experimental
@@ -272,7 +315,10 @@ models:
     api: staged-Python-API; audio.cpp-server task API
     amd_support: audio.cpp GGUF BF16/Q8/Q4 port; upstream AMD path explicitly experimental
     confidence: high-model; medium-low-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-and-license-review-required
   - id: music/heartmula-3b
     enabled: false
     registry_track: experimental
@@ -290,7 +336,10 @@ models:
     api: Python-CLI; audio.cpp-server task API
     amd_support: audio.cpp GGUF 16/Q8 and memory improvements; gfx1151 unverified
     confidence: high-model; medium-amd
-
+    track: experimental
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: audiocpp-amd-validation-required
   - id: speech/chatterbox-clone
     enabled: false
     stage: adapter-required
@@ -299,7 +348,10 @@ models:
     source: ResembleAI/chatterbox
     license: MIT
     approximate_disk_gib: 10
-
+    track: staged
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: adapter-required
   - id: image/flux2-klein
     enabled: false
     stage: exact-artifact-validation-required
@@ -308,7 +360,10 @@ models:
     source: black-forest-labs/FLUX.2-klein-4B
     license: Apache-2.0
     approximate_disk_gib: 25
-
+    track: staged
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: exact-artifact-validation-required
   - id: image/z-image-turbo
     enabled: false
     stage: exact-artifact-validation-required
@@ -317,7 +372,10 @@ models:
     source: Tongyi-MAI/Z-Image-Turbo
     license: Apache-2.0
     approximate_disk_gib: 30
-
+    track: staged
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: exact-artifact-validation-required
   - id: video/wan22-5b
     enabled: false
     stage: comfyui-workflow-required
@@ -326,7 +384,10 @@ models:
     source: Wan-AI/Wan2.2-TI2V-5B
     license: Apache-2.0
     approximate_disk_gib: 45
-
+    track: staged
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: comfyui-workflow-required
   - id: music/ace-step-xl
     enabled: false
     stage: openai-adapter-required
@@ -335,3 +396,13 @@ models:
     source: ACE-Step/ACE-Step-1.5
     license: MIT
     approximate_disk_gib: 50
+    track: staged
+    lifecycle: candidate
+    test_status: planned
+    promotion_gate: openai-adapter-required
+registry_id: canonical-2026.11.19
+as_of: "2026-11-19"
+policy:
+  active_requires_executable_test: true
+  candidate_requires_planned_test: true
+  advertise_only_active: true

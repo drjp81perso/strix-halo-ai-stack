@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import json,os,sys
+root=Path(sys.argv[1])
+required=['AI_API_KEY','HEAVY_HOST_RESERVE_GB','LIGHT_HOST_RESERVE_GB','HEAVY_MAX_CURRENT_GTT_GB','LIGHT_MAX_CURRENT_GTT_GB','TTS_MAX_CURRENT_GTT_GB','GPU_FIT_TARGET_MIB','MIN_FIT_CONTEXT','GLOBAL_CONCURRENCY_LIMIT']
+errors=[];vals={}
+for key in required:
+ val=os.environ.get(key,'');vals[key]='***' if key=='AI_API_KEY' and val else val
+ if not val:errors.append(f'missing environment variable: {key}')
+ elif key!='AI_API_KEY' and not val.isdigit():errors.append(f'{key} must be a non-negative integer, got {val!r}')
+if os.environ.get('GLOBAL_CONCURRENCY_LIMIT','0').isdigit() and int(os.environ.get('GLOBAL_CONCURRENCY_LIMIT','0'))<2:errors.append('GLOBAL_CONCURRENCY_LIMIT must be >=2 for Open WebUI burst testing (recommended: 4)')
+cfg=(root/'config/llama-swap.yaml').read_text()
+for key in required[1:]:
+ if '${env.'+key+'}' not in cfg:errors.append(f'generated config does not reference env policy: {key}')
+print(json.dumps({'environment':vals,'recommended_openwebui_limit':4,'note':'After changing .env, run docker compose up -d --force-recreate gateway; restart does not refresh environment.'},indent=2))
+if errors:
+ for e in errors:print('ERROR:',e,file=sys.stderr)
+ raise SystemExit(1)
+PY

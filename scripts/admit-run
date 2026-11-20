@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-# Usage: admit-run <required-host-GiB> <max-current-GTT-GiB> -- command ...
-req="${1:?required host-available GiB}"
-maxgtt="${2:?maximum current GTT GiB}"
+# Usage: admit-run <minimum-host-MemAvailable-GiB> <maximum-current-GTT-used-GiB> -- command ...
+# These are pre-start safety thresholds, not estimates of final model size.
+req="${1:?minimum host MemAvailable GiB}"
+maxgtt="${2:?maximum current GTT-used GiB}"
 shift 2
 [[ "${1:-}" == -- ]] && shift
 mem_kb=$(awk '/^MemAvailable:/ {print $2}' /host/proc/meminfo)
