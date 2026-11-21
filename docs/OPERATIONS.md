@@ -14,7 +14,13 @@ Observed:
 Vulkan0: Radeon 8060S Graphics (RADV GFX1151) (96986 MiB, 96813 MiB free)
 ```
 
-That is about 94.71 GiB visible to llama.cpp. It confirms the intended large Vulkan mapping and the Radeon—not llvmpipe—is selected. `rocm-smi`, DRM GTT, and generic gateway metrics may report different pools. Headless `vulkaninfo` DISPLAY/XDG/display-plane warnings are benign for compute.
+llama.cpp can use approximately 94.71 GiB on this device.
+
+The result also confirms that llama.cpp selected the Radeon device. It did not select llvmpipe.
+
+`rocm-smi`, DRM GTT counters, and gateway metrics can report different memory pools.
+
+The headless `vulkaninfo` warnings about DISPLAY, XDG, and display planes do not affect this compute task.
 
 ## Memory and admission policy
 

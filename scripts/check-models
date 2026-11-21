@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-set -u
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
-cd "$ROOT"
-if [[ -f .env ]]; then set -a; source .env; set +a; fi
-MODEL_DIR=${MODEL_DIR:-$ROOT/models}
-missing=0
-check(){ if [[ -s "$1" ]]; then printf 'OK      %s\n' "$1"; else printf 'MISSING %s\n' "$1"; missing=1; fi; }
-check "$MODEL_DIR/llm/qwen35/Qwen3.5-35B-A3B-Q5_K_M.gguf"
-for n in 1 2 3; do check "$MODEL_DIR/llm/qwen122/Qwen3.5-122B-A10B-Q4_K_M-$(printf '%05d' "$n")-of-00003.gguf"; done
-for n in 1 2 3 4; do check "$MODEL_DIR/llm/coder/Qwen3-Coder-Next-Q5_K_M-$(printf '%05d' "$n")-of-00004.gguf"; done
-check "$MODEL_DIR/vision/qwen3vl/Qwen3VL-32B-Instruct-Q4_K_M.gguf"
-check "$MODEL_DIR/vision/qwen3vl/mmproj-Qwen3VL-32B-Instruct-Q8_0.gguf"
-check "$MODEL_DIR/retrieval/Qwen3-Embedding-4B-Q8_0.gguf"
-check "$MODEL_DIR/retrieval/Qwen3-Reranker-4B-Q4_K_M.gguf"
-check "$MODEL_DIR/speech/whisper/ggml-large-v3-turbo-q5_0.bin"
-check "$MODEL_DIR/speech/kokoro/kokoro-82m-q8_0.gguf"
-exit "$missing"
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd);cd "$ROOT"
+json=$(mktemp);trap 'rm -f "$json"' EXIT
+python3 scripts/model-manager.py --track active status --json > "$json"
+python3 - "$json" <<'PY'
+import json,sys
+x=json.load(open(sys.argv[1]));bad=[]
+for m in x['models']:
+ state='OK' if m['managed'] and not m['missing'] else 'UNMANAGED' if not m['managed'] else 'MISSING'
+ print(f"{state:<10} {m['id']:<38} files={m['found_files']:<3} bytes={m['bytes']}")
+ if m['managed'] and m['missing']:bad.append(m['id'])
+print(f"unreferenced files={len(x['orphan_files'])} bytes={x['orphan_bytes']}")
+if bad:print('Missing active models:',', '.join(bad),file=sys.stderr);raise SystemExit(1)
+PY

@@ -1,6 +1,12 @@
 # Customizing for other hardware
 
-This repository is a reusable pattern: one authenticated OpenAI-compatible catalog, process-level on-demand loading, semantic tests, and explicit memory admission. The checked-in model roster is a **reference profile** validated on a 128 GB Ryzen AI Max+ 395 system; it is not a universal recommendation.
+This repository provides one authenticated, OpenAI-compatible catalog.
+
+It also provides on-demand loading, semantic tests, and memory admission.
+
+The included model roster is a reference profile. The project validated it on a Ryzen AI Max+ 395 system with 128 GiB of unified memory.
+
+The roster is not a universal recommendation.
 
 ## Concepts first
 
@@ -156,7 +162,11 @@ Use roughly:
 | 128 GiB | 18–24 GiB | 24–32 GiB |
 | 192 GiB | 28–36 GiB | 36–48 GiB |
 
-The second number is maximum **current** GTT usage allowed before starting. It detects unreleased/conflicting allocations; it is not the final model ceiling. On non-AMD or unreliable counters, adapt the guard rather than silently removing safeguards.
+The second number is the maximum current GTT use before a model starts.
+
+This value detects an allocation that did not unload. It is not the final model-memory limit.
+
+If the counter is not reliable on your hardware, adapt the guard. Do not silently remove the safeguard.
 
 ### llama.cpp fitting
 
@@ -179,7 +189,9 @@ Choose `fit-target` from GPU reserve in MiB:
 | 64–96 GiB | 4096–8192 |
 | 128+ GiB | 8192–12288 |
 
-Use the smallest acceptable `fit-ctx`; it is the floor to which automatic fitting may reduce context. For coding or RAG, 16K is a reasonable starting floor. For simple chat on small GPUs, 4K–8K may be appropriate.
+Set `fit-ctx` to the smallest acceptable context. Automatic fitting cannot reduce the context below this value.
+
+Use 16K as a starting floor for coding or RAG. Use 4K–8K for simple chat on a small GPU.
 
 ### Context and parallelism
 

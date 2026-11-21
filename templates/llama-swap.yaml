@@ -6,7 +6,9 @@ logLevel: info
 logToStdout: "proxy,upstream,http"
 logTimeFormat: rfc3339
 sendLoadingState: true
-includeAliasesInList: true
+# Aliases remain accepted for API compatibility but are hidden from /v1/models
+# to avoid duplicate entries in Open WebUI.
+includeAliasesInList: false
 globalTTL: 900
 unloadTimeout: 60
 # Open WebUI can issue a chat request plus a background title/tag/task request.
@@ -126,6 +128,8 @@ models:
       --model /models/speech/whisper/ggml-large-v3-turbo-q5_0.bin
       --inference-path /v1/audio/transcriptions
     ttl: 1800
+    # Multipart STT aliases require upstream model rewrite.
+    useModelName: speech/whisper-large-v3-turbo
     aliases: [whisper]
 
   speech/kokoro:
@@ -139,6 +143,8 @@ models:
       --config /etc/llama-swap/audiocpp.json
       --host 127.0.0.1 --port ${PORT} --backend cpu
     ttl: 1800
+    # audio.cpp validates the model field against its canonical configured ID.
+    useModelName: speech/kokoro
     aliases: [tts]
 
 routing:

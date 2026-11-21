@@ -19,6 +19,29 @@ The protocol exists because transport success is not semantic success. Observed 
 ./scripts/ai-stack protocol soak
 ```
 
+## Live terminal progress
+
+Every suite prints timestamped progress immediately (UTC), even though detailed command output is written to log files:
+
+```text
+[2026-11-20T00:20:00Z] SUITE START name=exposed run_id=...
+[2026-11-20T00:20:00Z] START environment                      suite=exposed test=1
+[2026-11-20T00:20:00Z] PASS  environment                      elapsed=0m00s log=...
+[2026-11-20T00:20:01Z] START exposed                          suite=exposed test=3
+...
+[2026-11-20T00:34:12Z] PASS  exposed                          elapsed=14m11s log=...
+[2026-11-20T00:34:12Z] SUITE PASS name=exposed elapsed=14m12s passed=3 failed=0 report=...
+```
+
+The exposed runner also emits one start/finish pair for every live model or alias ID:
+
+```text
+[...Z] START 01/16 id=agent-fast type=alias target=llm/fast test=exact-chat
+[...Z] PASS  01/16 id=agent-fast elapsed=0m06s log=...
+```
+
+On failure, the terminal shows the timestamp, elapsed time, exit code, log path, and the last 60 log lines. Long-running cold loads therefore no longer look like a hung test.
+
 Every run creates:
 
 ```text
@@ -61,7 +84,13 @@ This suite can take several minutes because coder/reasoner cold loads are intent
 
 ### Exposed
 
-Dynamically queries live `/v1/models`, runs a capability-appropriate functional test for every canonical advertised model, validates alias targets, and fails if any advertised model lacks a test. This is the primary answer to “does everything shown as available actually work?” See `docs/EXPOSED-MODEL-TEST.md`.
+The suite queries live `/v1/models`.
+
+It sends a real, capability-specific request for every returned ID. This includes canonical models and aliases.
+
+Aliases use the canonical test assertions. The request still uses the alias ID.
+
+The suite fails if it skips an ID or if an ID does not work. See `docs/EXPOSED-MODEL-TEST.md`.
 
 ### Open WebUI
 
@@ -126,7 +155,11 @@ A safe admission rejection is reported distinctly during model qualification, bu
 
 ## Candidate protocol
 
-Disabled models are not executed by `active`. They must have a planned contract in `tests/planned-models.yaml`. Promotion requires implementing that test kind, exact fixtures/artifacts, and moving it into `tests/models.yaml` before `enabled: true`.
+The `active` suite does not run disabled models.
+
+Each disabled model must have a planned contract in `tests/planned-models.yaml`.
+
+Before promotion, implement the test and add the exact fixtures and artifacts. Then, move the test to `tests/models.yaml` and set `enabled: true`.
 
 ## CI recommendation
 

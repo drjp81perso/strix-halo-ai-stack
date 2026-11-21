@@ -1,10 +1,9 @@
-cat > .gitignore <<'EOF'
 # Secrets and machine-local configuration
 .env
 .env.*
 !.env.example
 
-# Downloaded models and model caches
+# Downloaded models and model-manager state
 models/*
 !models/.gitkeep
 **/.cache/
@@ -53,7 +52,7 @@ __pycache__/
 .venv/
 venv/
 
-# Logs and temporary files
+# Logs, temporary files and downloaded bootstrap tools
 *.log
 *.tmp
 *.temp
@@ -61,8 +60,6 @@ venv/
 *.swo
 *~
 .DS_Store
-
-# Downloaded bootstrap tools
 get-pip.py
 
 # Archives and packages
@@ -72,7 +69,7 @@ get-pip.py
 *.zip
 *.7z
 
-# Local benchmark/test artifacts
+# Local test artifacts
 /tmp/
 test-results/
 coverage/
@@ -81,4 +78,3 @@ coverage/
 # IDE/editor state
 .vscode/
 .idea/
-EOF

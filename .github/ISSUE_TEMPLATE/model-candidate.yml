@@ -1,0 +1,49 @@
+name: Model candidate
+description: Propose a model for local qualification.
+title: "[Model]: "
+labels: [model-candidate]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Official model repository
+      placeholder: organization/model
+    validations:
+      required: true
+  - type: input
+    id: conversion
+    attributes:
+      label: Conversion repository
+      placeholder: organization/model-GGUF
+  - type: input
+    id: license
+    attributes:
+      label: License
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Exact artifacts
+      description: List quantization, projector, VAE, encoder, tokenizer, and checksums when available.
+    validations:
+      required: true
+  - type: textarea
+    id: target
+    attributes:
+      label: Target role and hardware
+      description: Include category, context, precision, backend, memory, and speed threshold.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Recommendation source
+      description: If you used whichllm or FreeLLMArena, include all input settings, result date, and estimated values.
+  - type: textarea
+    id: tests
+    attributes:
+      label: Promotion tests
+      description: State semantic, performance, memory, unload, and integration tests.
+    validations:
+      required: true

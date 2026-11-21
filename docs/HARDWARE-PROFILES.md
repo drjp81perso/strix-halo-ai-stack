@@ -117,7 +117,11 @@ GPU_FIT_TARGET_MIB=4096
 MIN_FIT_CONTEXT=16384
 ```
 
-If the backend exposes only 64 GiB, target about 52–58 GiB mapped weights and let large models spill to host. If it exposes approximately 96 GiB, target roughly 72–86 GiB weights after reserve. The reference profile measured about 94.7 GiB in llama.cpp and successfully ran a 76.5 GiB 122B MoE quant with hybrid placement.
+If the backend exposes only 64 GiB, use approximately 52–58 GiB for mapped weights. Put the remaining model data in host memory.
+
+If the backend exposes approximately 96 GiB, use approximately 72–86 GiB for weights after the reserve.
+
+The reference system showed 94.7 GiB in llama.cpp. It ran a 76.5 GiB, 122B MoE quant with hybrid placement.
 
 ## Model-role templates by tier
 

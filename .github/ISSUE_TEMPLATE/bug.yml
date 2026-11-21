@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible stack, runtime, or test error.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Error summary
+      description: State what failed and what you expected.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Git revision
+      placeholder: git rev-parse HEAD
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and software
+      description: Include CPU, GPU, RAM, OS, kernel, driver, backend, and container image.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Give commands in execution order. Remove all secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed API keys, tokens, private URLs, and personal data.
+          required: true
+        - label: I ran `./scripts/ai-stack protocol static`.
+          required: true

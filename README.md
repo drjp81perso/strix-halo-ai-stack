@@ -1,110 +1,90 @@
 # On-Demand Local AI Stack
 
-Docker-based, OpenAI-compatible model catalog with automatic loading/unloading, memory admission, and semantic tests. It can be adapted to discrete GPUs, unified-memory APUs, or CPU-only hosts.
+Run multiple local AI models behind one authenticated, OpenAI-compatible endpoint. The stack loads a model when a request arrives and unloads it after a period of inactivity.
 
-The checked-in roster is a validated **reference profile** for a Bosgame M5 / Ryzen AI Max+ 395 / 128 GB Ubuntu system. Start with:
+The reference configuration is for this system:
 
-- `docs/CUSTOMIZING.md` — generic sizing formulas, common RAM/VRAM tables, backend choices, and adaptation checklist
-- `docs/HARDWARE-PROFILES.md` — practical 8/12/16/24/48 GB discrete and 32/64/128 GB unified examples
-- `profiles/` — apply-ready memory-policy starting points
-- `docs/REFERENCE-STRIX-HALO.md` — decisions specific to the validated reference system
-- `docs/ARCHITECTURE.md` — control and execution planes
-- `docs/OPERATIONS.md` — measured behavior and troubleshooting
-- `docs/OPEN-WEBUI.md` — connection setup, audio/RAG wiring, concurrency and 429 troubleshooting
-- `docs/MODEL-ROSTER.md` — canonical active/balanced/experimental/staged roster
-- `docs/TESTING.md` — executable tests and candidate promotion contracts
-- `docs/AUTOMATED-TEST-PROTOCOL.md` — static, smoke, active, exposed, Open WebUI, full, and soak suites
-- `docs/EXPOSED-MODEL-TEST.md` — prove every canonical model listed by live `/v1/models` works
+- AMD Ryzen AI Max+ 395
+- Radeon 8060S integrated GPU
+- 128 GiB unified memory
+- Approximately 96 GiB available to Vulkan
+- Ubuntu
+- Docker Compose
 
-## What is operational on day one
+You can adapt the stack to other discrete-GPU, unified-memory, or CPU-only systems.
 
-One authenticated endpoint (`http://HOST:9292/v1`) announces and loads on demand:
+> **Note:** This project uses simplified technical English that follows ASD-STE100 principles. The project does not claim formal ASD-STE100 certification. See [Technical writing standard](docs/WRITING-STANDARD.md).
 
-| ID | Engine | Function |
+## Main functions
+
+- One `/v1` endpoint for Open WebUI and other OpenAI-compatible clients
+- On-demand model start and stop
+- Host-memory admission checks
+- Automatic device-memory fitting for llama.cpp
+- Separate routes for chat, vision, embeddings, reranking, speech-to-text, and text-to-speech
+- Functional tests for each model that appears in `/v1/models`
+- Registry-based model inventory, download, replacement, quarantine, and purge
+- Hardware profiles for common RAM and VRAM sizes
+
+## Active reference models
+
+| Model ID | Function | Engine |
 |---|---|---|
-| `llm/fast` | llama.cpp Vulkan | Qwen 3.5 35B-A3B Q5 fast agent |
-| `llm/reasoning` | llama.cpp Vulkan | Qwen 3.5 122B-A10B Q4 reasoner |
-| `llm/coder` | llama.cpp Vulkan | Qwen 3 Coder Next Q5 |
-| `llm/vision` | llama.cpp Vulkan | Qwen 3 VL 32B Q4 + Q8 projector |
-| `retrieval/embedding` | llama.cpp Vulkan | Qwen 3 Embedding 4B Q8 |
-| `retrieval/reranker` | llama.cpp Vulkan | Qwen 3 Reranker 4B Q4 |
-| `speech/whisper-large-v3-turbo` | whisper.cpp Vulkan | Speech recognition |
-| `speech/kokoro` | audio.cpp CPU | Text-to-speech |
+| `llm/fast` | Fast chat and background tasks | llama.cpp Vulkan |
+| `llm/reasoning` | Strong reasoning | llama.cpp Vulkan |
+| `llm/coder` | Coding | llama.cpp Vulkan |
+| `llm/vision` | Vision and OCR | llama.cpp Vulkan |
+| `retrieval/embedding` | Embeddings | llama.cpp Vulkan |
+| `retrieval/reranker` | Reranking | llama.cpp Vulkan |
+| `speech/whisper-large-v3-turbo` | Speech-to-text | whisper.cpp Vulkan |
+| `speech/kokoro` | Text-to-speech | audio.cpp CPU |
 
-The concrete source/artifact registry is `registry/models.yaml`. Versioned selection tracks are also included:
+Only active models appear in `/v1/models`. Candidate models remain hidden until they pass their promotion tests.
 
-- `models-v2.2026-11-stable.yaml` — conservative baseline
-- `models-v3.2026-11-frontier.yaml` — recent credible candidates
-- `models-v4.2026-11-lab.yaml` — speculative watchlist
+## Read this first
 
-See `registry/README.md`. Registries do not automatically announce models; only promoted entries added to `config/llama-swap.yaml` appear through `/v1/models`. Review all tracks with `./scripts/registry-report`.
+| Document | Purpose |
+|---|---|
+| [Quick start](#quick-start) | Install and start the reference stack. |
+| [Customization guide](docs/CUSTOMIZING.md) | Calculate memory limits and adapt the stack. |
+| [Hardware profiles](docs/HARDWARE-PROFILES.md) | Use example settings for common VRAM and unified-memory sizes. |
+| [Reference hardware](docs/REFERENCE-STRIX-HALO.md) | Review settings that are specific to Ryzen AI Max+ 395. |
+| [Architecture](docs/ARCHITECTURE.md) | Understand the control plane and the execution plane. |
+| [Open WebUI](docs/OPEN-WEBUI.md) | Connect chat, audio, and retrieval functions. |
+| [Open WebUI presets](docs/OPEN-WEBUI-PRESETS.md) | Add clear role names without duplicate backend aliases. |
+| [Model roster](docs/MODEL-ROSTER.md) | Review active and candidate models. |
+| [Model selection tools](docs/MODEL-SELECTION-TOOLS.md) | Use `whichllm` and FreeLLMArena to make a candidate list. |
+| [Model lifecycle](docs/MODEL-LIFECYCLE.md) | Download, replace, quarantine, restore, and purge model files. |
+| [Automated test protocol](docs/AUTOMATED-TEST-PROTOCOL.md) | Test configuration, models, aliases, and Open WebUI behavior. |
+| [Operations](docs/OPERATIONS.md) | Review measured results and troubleshooting information. |
 
-Video, advanced images, music, and voice cloning are deliberately recorded as **staged** entries. They need pinned ROCm images plus workflow/API adapters; see `docs/STAGED-MULTIMEDIA.md`. They are not falsely advertised as working OpenAI endpoints before those adapters are built and tested.
+## Quick start
 
-## Memory policy
-
-Memory thresholds are configured in `.env`, interpreted as **pre-start safety reserves**, and documented in `docs/CUSTOMIZING.md`. The checked-in defaults preserve the validated reference behavior: 20 GiB host reserve for heavy models, 16 GiB for light models, automatic llama.cpp fitting, and one heavyweight model at a time.
-
-On unified-memory systems, mapped GPU memory is part of physical RAM—not additional capacity. On discrete systems, RAM and VRAM are separate constraints. In both cases, measure cold-load peaks and unloading before promoting a model.
-
-Model processes are children of llama-swap; group switching and TTL terminate old servers. No Docker socket is mounted and inference should not depend on disk swap.
-
-## 1. Prerequisites
+### 1. Install prerequisites
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose-v2 python3-pip vulkan-tools
+sudo apt install -y docker.io docker-compose-v2 python3-pip vulkan-tools jq
 sudo usermod -aG docker,video,render "$USER"
 ```
 
-Log out and back in. Confirm:
+Log out. Then, log in again.
 
-```bash
-vulkaninfo --summary
-ls -l /dev/dri
-cat /sys/class/drm/card*/device/mem_info_gtt_total
-```
-
-Use a kernel and driver supported by your hardware. The reference image uses Vulkan; CUDA, ROCm, SYCL, Metal, and CPU-only deployments require the corresponding engine image or native runtime. See `docs/CUSTOMIZING.md`.
-
-## 2. Configure
+### 2. Create the environment file
 
 ```bash
 cp .env.example .env
+chmod 600 .env
 ```
 
-Determine group IDs:
+Get the GPU group IDs:
 
 ```bash
 getent group video
 getent group render
 ```
 
-Put the numeric values into `VIDEO_GID` and `RENDER_GID`.
-
-Choose memory-policy values using `docs/CUSTOMIZING.md` or apply a starting profile:
-
-```bash
-./scripts/apply-profile profiles/discrete-24gb.env
-# or: profiles/unified-32gb.env, unified-64gb.env, unified-128gb.env
-```
-
-The command backs up `.env`, changes safety/fitting thresholds, regenerates, and validates. It does not change the model roster. The `.env.example` defaults match the 128 GB reference system; smaller hosts must select smaller model artifacts and update the model template.
-
-Set the host model library in `.env`. For example:
-
-```dotenv
-MODEL_DIR=/srv/ai-models
-```
-
-Create it and grant your user ownership:
-
-```bash
-sudo mkdir -p /srv/ai-models
-sudo chown "$USER:$USER" /srv/ai-models
-```
-
-Compose mounts `${MODEL_DIR}` read-only at `/models` inside the gateway. All paths in `config/llama-swap.yaml` are container paths under `/models`; download and check scripts resolve the same host `MODEL_DIR` automatically. You can instead use `MODEL_DIR=./models`, but an absolute path on the model NVMe is recommended.
+Set `VIDEO_GID` and `RENDER_GID` in `.env`.
 
 Generate an API key:
 
@@ -112,224 +92,207 @@ Generate an API key:
 printf 'sk-%s\n' "$(openssl rand -base64 48 | tr -d '\n')"
 ```
 
-Put it into `AI_API_KEY`, then:
+Set the result as `AI_API_KEY` in `.env`.
+
+### 3. Set the model directory
+
+Set an absolute path in `.env`:
+
+```dotenv
+MODEL_DIR=/srv/ai-models
+```
+
+Create the directory:
 
 ```bash
-chmod 600 .env
+sudo mkdir -p /srv/ai-models
+sudo chown "$USER:$USER" /srv/ai-models
+```
+
+### 4. Select a hardware profile
+
+The default values match the 128 GiB reference system. For another system, apply a profile:
+
+```bash
+./scripts/apply-profile profiles/discrete-24gb.env
+```
+
+Other examples are in `profiles/`.
+
+> **Caution:** A hardware profile changes memory limits. It does not change the model roster. Select model files that fit your hardware.
+
+### 5. Run the preflight check
+
+```bash
 ./scripts/preflight
 ```
 
-`AI_BIND=127.0.0.1` is secure for same-host access. Change it to the Bosgame's LAN IP only if Open WebUI runs elsewhere. Do not use `0.0.0.0` without a trusted firewall/reverse proxy.
+For Vulkan systems, list the device memory that llama.cpp can use:
 
-If Open WebUI has a different browser origin, add it under `security.cors.allowedOrigins` in `config/llama-swap.yaml`.
+```bash
+docker compose build --pull
+docker compose run --rm --entrypoint llama-server gateway --list-devices
+```
 
-## 3. Download the enabled model set
+### 6. Download the active models
 
-Install the current Hugging Face CLI:
+Install the Hugging Face CLI:
 
 ```bash
 python3 -m pip install --user -U huggingface_hub
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Download roughly 190 GB:
+Download the active model set:
 
 ```bash
-./scripts/download-models
+./scripts/ai-stack model-sync active
 ```
 
-Downloads are written to the `MODEL_DIR` configured in `.env`. Or download only the models you need by following `registry/models.yaml`. Missing weights do not prevent the gateway from starting, but selecting that model will fail clearly.
+Review the model inventory:
 
-## 4. Validate and start
+```bash
+./scripts/ai-stack model-status active
+```
+
+### 7. Validate and start the stack
 
 ```bash
 ./scripts/validate
 ./scripts/start
 ```
 
-The canonical llama-swap template is `templates/llama-swap.yaml`; generate the rendered file with `./scripts/generate-config`. The generator reads `templates/runtime-policy.yaml` and refuses obsolete flags. `./scripts/generate-config --check`, `./scripts/validate`, and `./scripts/start` all fail if the rendered config is stale or violates policy.
-
-The custom image adds `admit-run`, runtime flag validation, and small diagnostic utilities to the official unified Vulkan image. `scripts/start` verifies every llama-server flag against the binary before launching llama-swap.
-
-Current llama.cpp removed `--no-mmap`. The stack leaves its default `--load-mode auto` behavior in place. If a specific Strix Halo build demonstrably requires mmap disabled, use the current equivalent `--load-mode none` after benchmarking it—not the obsolete flag.
-
-Inspect:
+Expected health result:
 
 ```bash
-docker compose logs -f gateway
-./scripts/status
+curl -fsS http://127.0.0.1:9292/health
 ```
-
-Test discovery:
-
-```bash
-./scripts/test-api
-```
-
-Test an actual cold load and generation:
-
-```bash
-./scripts/test-api --generate
-```
-
-The first request can take minutes while weights load.
-
-## 5. Connect existing Open WebUI
-
-Configure an OpenAI-compatible connection:
 
 ```text
-Base URL: http://127.0.0.1:9292/v1
-API key:  value of AI_API_KEY
+OK
 ```
 
-If Open WebUI is in Docker on the same host, use either:
-
-```text
-http://host.docker.internal:9292/v1
-```
-
-with `host.docker.internal:host-gateway`, or attach its container to `strix-halo-ai` and use:
-
-```text
-http://gateway:8080/v1
-```
-
-For the shared network:
+### 8. Run the smoke test
 
 ```bash
-docker network connect strix-halo-ai <open-webui-container-name>
+./scripts/ai-stack protocol smoke
 ```
 
-Open WebUI configures chat, STT, TTS, embedding, and reranking in separate settings even though they share this gateway.
+### 9. Connect Open WebUI
 
-## 6. User-friendly management
+Use this OpenAI-compatible connection:
 
-Use the wrapper for normal operations:
+```text
+Base URL: http://AI_HOST:9292/v1
+API key:  AI_API_KEY from .env
+Provider: Default
+```
+
+See [Open WebUI integration](docs/OPEN-WEBUI.md) for audio and retrieval settings.
+
+## Daily commands
 
 ```bash
-./scripts/ai-stack --help
 ./scripts/ai-stack status
 ./scripts/ai-stack models
 ./scripts/ai-stack roster
-./scripts/ai-stack config
-./scripts/ai-stack test llm/fast
-./scripts/ai-stack test-all
-./scripts/ai-stack protocol exposed
-./scripts/ai-stack protocol openwebui
-./scripts/ai-stack protocol full
+./scripts/ai-stack model-status all
+./scripts/ai-stack logs
 ./scripts/ai-stack unload
-./scripts/ai-stack ui
 ```
 
-Management UI: `http://HOST:9292/ui`. Tests run sequentially and save JSON under `benchmark-results/`. See `docs/OPERATIONS.md` and `docs/TESTING.md`.
-
-## 7. API examples
+Run all functional tests for models in the live catalog:
 
 ```bash
-set -a; source .env; set +a
-BASE="http://${AI_BIND}:${AI_PORT}"
-AUTH="Authorization: Bearer ${AI_API_KEY}"
+./scripts/ai-stack protocol exposed
 ```
 
-Models:
+Run the Open WebUI concurrency test:
 
 ```bash
-curl -s -H "$AUTH" "$BASE/v1/models" | jq
+./scripts/ai-stack protocol openwebui
 ```
 
-Chat:
+Run the full acceptance protocol:
 
 ```bash
-curl -s -H "$AUTH" -H 'Content-Type: application/json' \
-  "$BASE/v1/chat/completions" -d '{
-    "model":"llm/fast",
-    "messages":[{"role":"user","content":"Explain UMA briefly."}],
-    "stream":false
-  }' | jq
+./scripts/ai-stack protocol full
 ```
 
-Transcription:
+## Model selection workflow
+
+Use external tools to make a candidate list. Do not use their estimates as promotion evidence.
+
+Run `whichllm`:
 
 ```bash
-curl -s -H "$AUTH" "$BASE/v1/audio/transcriptions" \
-  -F model=speech/whisper-large-v3-turbo -F file=@recording.wav
+uvx whichllm@latest
 ```
 
-Speech:
+For a specified device-memory limit:
 
 ```bash
-curl -s -H "$AUTH" -H 'Content-Type: application/json' \
-  "$BASE/v1/audio/speech" -d '{
-    "model":"speech/kokoro",
-    "voice":"siwis-fr",
-    "input":"Bonjour depuis le serveur local."
-  }' -o output.wav
+uvx whichllm@latest --vram 96
 ```
 
-Reranking:
+Open [FreeLLMArena Run at Home](https://freellmarena.com/home) to compare category recommendations.
+
+Then, use this project workflow:
+
+1. Add the candidate to `registry/models.yaml`.
+2. Add a planned test to `tests/planned-models.yaml`.
+3. Download the exact artifacts.
+4. Register a temporary endpoint.
+5. Measure quality, speed, memory, and unload behavior.
+6. Promote the candidate only if all required tests pass.
+7. Move old files to quarantine.
+8. Purge the quarantine after the rollback period.
+
+See [Model selection tools](docs/MODEL-SELECTION-TOOLS.md) and [Model lifecycle](docs/MODEL-LIFECYCLE.md).
+
+## Model-file safety
+
+List unreferenced files without changing them:
 
 ```bash
-curl -s -H "$AUTH" -H 'Content-Type: application/json' \
-  "$BASE/v1/rerank" -d '{
-    "model":"retrieval/reranker",
-    "query":"AMD unified memory",
-    "documents":["An apple recipe", "A description of shared CPU/GPU RAM"]
-  }' | jq
+./scripts/ai-stack model-prune all
 ```
 
-## 8. Loading and unloading behavior
-
-- A request's `model` selects the configured process.
-- llama-swap starts it on an automatically assigned loopback port.
-- Requests wait for `/health` (or the backend's configured readiness route).
-- A conflicting heavyweight is terminated first.
-- Each model's TTL starts after activity stops.
-- Unload everything immediately:
+Move reviewed files to quarantine:
 
 ```bash
-./scripts/unload
+./scripts/ai-stack model-prune all --apply
 ```
 
-Unload one model:
+> **Warning:** Do not use `active --apply` when you want to keep downloaded candidate models. The command will quarantine files that are not in the active track.
+
+Permanently delete old quarantine directories only after the rollback period:
 
 ```bash
-./scripts/unload llm/fast
+python3 scripts/model-manager.py purge \
+  --older-than-days 14 \
+  --apply
 ```
 
-View running models and memory:
+## Security
 
-```bash
-./scripts/status
-```
+- Keep `.env` out of Git.
+- Rotate a key if it appears in a log, issue, or chat.
+- Bind the API to a trusted interface.
+- Use a firewall or a reverse proxy when the service is available outside the host.
+- Keep model directories read-only in the inference container.
+- Do not mount the Docker socket in the public gateway.
+- Review model licenses before you download or promote a model.
 
-## 9. Tuning
+## Project status
 
-Start with the supplied contexts. Do not jump to advertised 256K contexts.
+The text, vision, retrieval, and basic speech functions are active. Image, video, music, and voice-cloning models remain candidates until their runtimes and tests are complete.
 
-For the 122B model, monitor cold-load and generation peaks:
+See [Model roster](docs/MODEL-ROSTER.md) for the current state.
 
-```bash
-watch -n1 free -h
-watch -n1 'cat /sys/class/drm/card*/device/mem_info_gtt_used'
-docker stats
-```
+## Contributing and support
 
-If Qwen 122B exceeds the safe envelope:
-
-1. Reduce context to 16K.
-2. Keep Q8 KV cache.
-3. Unload speech/retrieval first.
-4. Only then reduce `--n-gpu-layers` to create a deliberate CPU/GPU split.
-
-Do not rely on swap. A clean capacity failure is preferable to host paging or OOM-killing the control plane.
-
-## 10. Security and limitations
-
-- Pin the floating base image to a tested digest after first validation.
-- Models are mounted read-only.
-- The API binds to loopback by default and requires a key.
-- The media service also binds to loopback by default.
-- `admit-run` sees host memory counters read-only.
-- The system currently uses process-level inference inside the gateway container. This guarantees reliable teardown without granting Docker-daemon control.
-- Python/ROCm multimedia runtimes will later be sibling containers controlled through a restricted launcher—not a raw Docker socket.
+- Read [Contributing](CONTRIBUTING.md) before you open a pull request.
+- Use the GitHub issue templates for bugs, model candidates, and documentation changes.
+- Read [Security policy](SECURITY.md) before you report a vulnerability or an exposed credential.
+- Follow the [Code of conduct](CODE_OF_CONDUCT.md).

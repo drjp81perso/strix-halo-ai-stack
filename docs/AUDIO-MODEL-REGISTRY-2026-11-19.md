@@ -4,9 +4,27 @@ Target: Ryzen AI Max+ 395 (`gfx1151`), 128 GiB unified RAM, no more than about 9
 
 ## Decision
 
-Use **audio.cpp v0.9.5** as the first experimental native execution plane. It exposes HIP/ROCm and Vulkan backends, GGUF packages, a model manager, WebUI, CLI, C ABI, and server routes including `/v1/audio/speech` and `/v1/audio/transcriptions`. It already lists Qwen3 ASR/TTS, MOSS, Fish, IndexTTS, VibeVoice, ACE-Step, HeartMuLa, YuE2 and many other current families. This dramatically reduces the adapter burden, but does **not** prove that every family works correctly or quickly on `gfx1151`.
+Use **audio.cpp v0.9.5** as the first experimental native execution plane.
 
-Keep the present whisper.cpp + Kokoro baseline until the candidates pass clean-reboot tests. For Python-native projects, pin a TheRock/ROCm/PyTorch build known to target `gfx1151`; never assume a CUDA README or generic `device="cuda"` example constitutes AMD support.
+It provides:
+
+- HIP/ROCm and Vulkan backends
+- GGUF packages
+- A model manager
+- A WebUI and a CLI
+- A C API
+- `/v1/audio/speech`
+- `/v1/audio/transcriptions`
+
+It lists many current audio model families. This reduces the need for adapters.
+
+> **Caution:** A listed model family is not proof of correct or fast operation on `gfx1151`.
+
+Keep whisper.cpp and Kokoro as the baseline until a candidate passes the clean-reboot tests.
+
+For a Python runtime, pin a TheRock, ROCm, and PyTorch combination that targets `gfx1151`.
+
+> **Note:** A CUDA procedure or `device="cuda"` example does not prove AMD support.
 
 ## Balanced track (`2026.11.19`)
 

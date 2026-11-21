@@ -29,13 +29,20 @@ for model in registry:
 print(f'ROSTER/TEST COVERAGE OK active={len(active)} planned={len(planned)}')
 PY
 ./scripts/generate-config --check
+python3 scripts/check-docs.py
 # Scan every source that can regenerate or document commands, not only rendered config.
 if grep -R --line-number --fixed-strings --exclude=runtime-policy.yaml -- '--no-mmap' \
    config templates registry; then
   echo 'ERROR: obsolete --no-mmap found outside its forbidden-flag policy declaration.' >&2
   exit 1
 fi
-for f in scripts/*; do bash -n "$f"; echo "SHELL OK $f"; done
+for f in scripts/*; do
+  [[ -f "$f" ]] || continue
+  case "$f" in
+    *.py) python3 -m py_compile "$f"; echo "PYTHON OK $f" ;;
+    *) bash -n "$f"; echo "SHELL OK $f" ;;
+  esac
+done
 if docker info >/dev/null 2>&1; then
   cp -n .env.example .env.validation
   docker compose --env-file .env.validation config -q

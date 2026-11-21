@@ -13,6 +13,10 @@ Forward cookies: Off
 
 Use an address reachable from the Open WebUI backend/container. `localhost` inside that container is not the AI host unless both services share a network namespace.
 
+The gateway hides aliases from `/v1/models` with `includeAliasesInList: false`. Thus, Open WebUI does not show each backend two times.
+
+A client can still use a known alias. Use Workspace model presets for clear role names. See `docs/OPEN-WEBUI-PRESETS.md`.
+
 Allowlist chat models only:
 
 ```text
@@ -34,7 +38,11 @@ Reranking through `/v1/rerank` depends on the installed Open WebUI version/provi
 
 ## Why a cold model may briefly show “Too many requests”
 
-Open WebUI may issue more than one request around a user message: the main chat plus background tasks such as title, tags, or follow-up generation. The original gateway setting `globalConcurrencyLimit: 1` rejected the second request immediately with HTTP 429 while the first request was cold-loading.
+Open WebUI can send more than one request for a user message.
+
+It sends the main chat request. It can also send requests for a title, tags, or follow-up text.
+
+The old setting `globalConcurrencyLimit: 1` rejected the second request with HTTP 429 during a cold load.
 
 The server log signature is:
 
@@ -65,7 +73,9 @@ This does **not** load four heavyweight models or create four llama.cpp slots:
 - memory admission remains in force;
 - extra gateway requests wait behind loading/routing rather than being rejected globally.
 
-If many Open WebUI users will share the service, do not blindly raise this number. Benchmark queueing and then either add model slots with an explicit memory budget or retain a low concurrency cap and accept controlled 429 responses.
+Do not increase this value without a test when many users share the service.
+
+First, measure the queue behavior. Then, add model slots with an explicit memory budget, or keep a low limit and accept controlled HTTP 429 responses.
 
 ## Apply the fix
 
@@ -107,7 +117,9 @@ Check startup logs for configuration errors and then retry a fresh chat.
 
 ## Background-task model recommendation
 
-In Open WebUI, use `llm/fast` for title/tag/task generation if your version exposes task-model settings. Avoid sending background tasks to `llm/coder` or `llm/reasoning`; that needlessly cold-loads larger models and consumes their single slot.
+If Open WebUI has a task-model setting, use `llm/fast` for titles, tags, and other background tasks.
+
+Do not send background tasks to `llm/coder` or `llm/reasoning`. A background task can start a large model and occupy its only slot.
 
 If the UI still shows 429:
 
