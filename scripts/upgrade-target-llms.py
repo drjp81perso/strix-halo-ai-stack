@@ -48,7 +48,14 @@ def edit_registry(candidates,promote=False):
 def qualify(cid,spec,env,out):
  serve='candidate/'+cid.split('/',1)[1];base=f"http://127.0.0.1:{env.get('AI_PORT','9292')}";key=env['AI_API_KEY'];results=[]
  for testid in spec['tests']:
-  start=time.monotonic();r=run([sys.executable,'tests/run.py',serve,'--spec-id',testid,'--base',base,'--key',key],check=False,capture=True,env=env);log=out/f"{serve.replace('/','__')}--{testid.replace('/','__')}.log";log.write_text(r.stdout+'\n'+r.stderr);latest=sorted((ROOT/'benchmark-results').glob(serve.replace('/','__')+'-*.json'),key=lambda p:p.stat().st_mtime)
+  start=time.monotonic();started_at=time.time();before={p.resolve() for p in (ROOT/'benchmark-results').glob(serve.replace('/','__')+'-*.json')};r=run([sys.executable,'tests/run.py',serve,'--spec-id',testid,'--base',base,'--key',key],check=False,capture=True,env=env);log=out/f"{serve.replace('/','__')}--{testid.replace('/','__')}.log";log.write_text(r.stdout+'\n'+r.stderr);latest=[]
+  for p in (ROOT/'benchmark-results').glob(serve.replace('/','__')+'-*.json'):
+   if p.resolve() in before:continue
+   if p.stat().st_mtime+1<started_at:continue
+   try:data=json.loads(p.read_text())
+   except json.JSONDecodeError:continue
+   if data.get('model')==serve and data.get('spec_id')==testid:latest.append(p)
+  latest.sort(key=lambda p:p.stat().st_mtime)
   tps=None
   state='runtime-fail';qualification={} ; error=None
   if latest:
