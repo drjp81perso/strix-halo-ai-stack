@@ -43,6 +43,8 @@ def validate(kind,d,s):
   if reasoning:raise RuntimeError('exact-chat returned unexpected reasoning_content')
  elif kind=='python-code':
   ch=d.get('choices',[{}])[0];content=ch.get('message',{}).get('content') or ''
+  if ch.get('finish_reason')!='stop':raise RuntimeError(f'python-code finish_reason={ch.get("finish_reason")!r}, expected stop')
+  if not content.strip():raise RuntimeError('python-code final content is empty')
   match=re.search(r'```(?:python)?\s*(.*?)```',content,re.S)
   if not match:raise RuntimeError(f'python-code response has no fenced Python block; response={content[:1000]!r}')
   code=match.group(1);count=code.count('assert ')
@@ -63,7 +65,9 @@ def validate(kind,d,s):
   if not re.search(r'(?<!\d)10\s*/\s*21(?!\d)',content) or not re.search(r'47(?:\.6(?:19|2)?)?\s*%',content):raise RuntimeError(f'bayes-reasoning final answer is incorrect: {content[:1200]!r}')
   if re.search(r'(?<!\d)5\s*/\s*42(?!\d)',content):raise RuntimeError('bayes-reasoning contains known incorrect answer 5/42')
  elif kind=='vision-shape':
-  content=(d['choices'][0]['message'].get('content') or '').lower()
+  ch=d.get('choices',[{}])[0];content=(ch.get('message',{}).get('content') or '').lower()
+  if ch.get('finish_reason')!='stop':raise RuntimeError(f'vision-shape finish_reason={ch.get("finish_reason")!r}, expected stop')
+  if not content.strip():raise RuntimeError('vision-shape final content is empty')
   if 'red' not in content or not ('square' in content or 'rectangle' in content):raise RuntimeError(f'vision-shape did not identify a red square/rectangle: {content[:1000]!r}')
  elif kind=='embedding-similarity':
   vectors=[x['embedding'] for x in d['data']]
@@ -75,12 +79,32 @@ def validate(kind,d,s):
   scores={x.get('index',i):x.get('relevance_score',x.get('score')) for i,x in enumerate(rows)}
   if not all(math.isfinite(x) for x in scores.values()):raise RuntimeError(f'rerank returned invalid scores: {scores!r}')
   if scores[0]<=scores[1]:raise RuntimeError(f'rerank ordering failed: {scores!r}')
+def classify(kind,d,status,after,error=None):
+ # Separate model capability from the client-visible response contract.
+ q={'runtime':'pass' if status==200 else 'fail','capability':'unknown','response_contract':'not-applicable','lifecycle':'pass' if not after.get('running',[]) else 'fail'}
+ state='pass'
+ if status!=200:
+  return 'runtime-fail',q
+ if kind in {'exact-chat','python-code','bayes-reasoning','vision-shape'}:
+  ch=d.get('choices',[{}])[0];msg=ch.get('message',{});content=(msg.get('content') or '').strip();reasoning=(msg.get('reasoning_content') or '').strip();combined=(content+'\n'+reasoning).lower()
+  q['response_contract']='pass' if ch.get('finish_reason')=='stop' and bool(content) else 'fail'
+  if kind=='vision-shape':q['capability']='pass' if 'red' in combined and ('square' in combined or 'rectangle' in combined) else 'fail'
+  elif kind=='python-code':q['capability']='pass' if 'merge_intervals' in combined else 'fail'
+  else:q['capability']='pass' if content or reasoning else 'fail'
+  if q['capability']=='pass' and q['response_contract']=='fail':state='capability-pass-contract-fail'
+  elif q['capability']=='fail':state='semantic-fail'
+ elif error:
+  q['capability']='fail';state='semantic-fail'
+ else:q['capability']='pass'
+ if q['lifecycle']=='fail':state='lifecycle-fail'
+ if error and state=='pass':state='semantic-fail'
+ return state,q
 def error_message(body):
  try:
   d=json.loads(body);return d.get('error',{}).get('message') or d.get('message') or str(d)
  except:return body.decode(errors='replace')[:1000]
 def save_result(model,spec_id,kind,status,elapsed,before,loaded,running,after,data,passed,error=None):
- result={'model':model,'spec_id':spec_id,'kind':kind,'status':status,'passed':passed,'error':error,'wall_seconds':round(elapsed,3),'before':before,'loaded':loaded,'running_loaded':running,'running_after':after,'effective_policy':{k:os.environ.get(k) for k in ('HEAVY_HOST_RESERVE_GB','LIGHT_HOST_RESERVE_GB','GPU_FIT_TARGET_MIB','MIN_FIT_CONTEXT','GLOBAL_CONCURRENCY_LIMIT','PROTOCOL_UNLOAD_WAIT_SECONDS','PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB')},'response':data}
+ state,qualification=classify(kind,data,status,after,error);result={'model':model,'spec_id':spec_id,'kind':kind,'status':status,'passed':passed,'qualification_state':state,'qualification':qualification,'error':error,'wall_seconds':round(elapsed,3),'before':before,'loaded':loaded,'running_loaded':running,'running_after':after,'effective_policy':{k:os.environ.get(k) for k in ('HEAVY_HOST_RESERVE_GB','LIGHT_HOST_RESERVE_GB','GPU_FIT_TARGET_MIB','MIN_FIT_CONTEXT','GLOBAL_CONCURRENCY_LIMIT','PROTOCOL_UNLOAD_WAIT_SECONDS','PROTOCOL_MEMORY_RETURN_TOLERANCE_GIB')},'response':data}
  out=ROOT/'benchmark-results'/f"{model.replace('/','__')}-{time.strftime('%Y%m%d-%H%M%S')}.json";out.parent.mkdir(exist_ok=True);out.write_text(json.dumps(result,indent=2));return out,result
 def main():
  p=argparse.ArgumentParser();p.add_argument('model');p.add_argument('--spec-id');p.add_argument('--base',required=True);p.add_argument('--key',required=True);a=p.parse_args();spec_id=a.spec_id or a.model;spec=yaml.safe_load((ROOT/'tests/models.yaml').read_text())['tests'][spec_id];kind=spec['kind'];unload(a.base,a.key);before=metrics(a.base,a.key);start=time.monotonic();st=0;data={};loaded={};running={'running':[]};after={'running':[]};error=None

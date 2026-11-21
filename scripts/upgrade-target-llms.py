@@ -4,8 +4,8 @@ from pathlib import Path
 import argparse,copy,datetime,json,os,shutil,subprocess,sys,time,yaml
 ROOT=Path(__file__).resolve().parents[1]
 TARGETS={
- 'llm/qwen38-27b-q5':{'stable_id':'llm/coder','replace_ids':['llm/coder'],'name':'Qwen 3.8 27B Q5 — Coding and Agents','description':'16K coding, agents, chat and vision model','model':'/models/llm/qwen38-27b-q5/Qwen3.8-27B-UD-Q5_K_M.gguf','mmproj':'/models/llm/qwen38-27b-q5/mmproj-BF16.gguf','tests':['llm/coder','llm/fast','llm/vision'],'min_tps':7.5,'ttl':900},
- 'llm/gemma4-31b-q5':{'stable_id':'llm/vision','replace_ids':['llm/vision'],'name':'Gemma 4 31B Q5 — Vision and Documents','description':'16K chat, vision and documents model','model':'/models/llm/gemma4-31b-q5/gemma-4-31B-it-Q5_K_M.gguf','mmproj':'/models/llm/gemma4-31b-q5/mmproj-BF16.gguf','tests':['llm/vision','llm/fast'],'min_tps':7.5,'ttl':900},
+ 'llm/qwen38-27b-q5':{'stable_id':'llm/coder','replace_ids':['llm/coder'],'name':'Qwen 3.8 27B Q5 — Coding and Agents','description':'16K coding, agents, chat and vision model','model':'/models/llm/qwen38-27b-q5/Qwen3.8-27B-UD-Q5_K_M.gguf','mmproj':'/models/llm/qwen38-27b-q5/mmproj-BF16.gguf','profile':'coder','tests':['upgrade/coder','upgrade/chat','upgrade/vision'],'min_tps':7.5,'ttl':900},
+ 'llm/gemma4-31b-q5':{'stable_id':'llm/vision','replace_ids':['llm/vision'],'name':'Gemma 4 31B Q5 — Vision and Documents','description':'16K chat, vision and documents model','model':'/models/llm/gemma4-31b-q5/gemma-4-31B-it-Q5_K_M.gguf','mmproj':'/models/llm/gemma4-31b-q5/mmproj-BF16.gguf','profile':'vision','tests':['upgrade/vision','upgrade/chat'],'min_tps':7.5,'ttl':900},
 }
 def run(cmd,check=True,capture=False,env=None):
  print('+',' '.join(map(str,cmd)),flush=True);return subprocess.run(cmd,cwd=ROOT,check=check,text=True,capture_output=capture,env=env)
@@ -17,8 +17,10 @@ def envfile():
     k,v=l.split('=',1);d[k]=v.strip().strip('"').strip("'")
  return d
 def block(mid,s):
+ # Candidate profiles are role-specific. Basic coder and vision contracts require visible final output.
+ reasoning=' --reasoning off' if s['profile'] in {'coder','vision'} else ''
  mm=f" --mmproj {s['mmproj']}" if s.get('mmproj') else ''
- return {'name':s['name'],'description':s['description'],'capabilities':{'in':['text','image'],'out':['text'],'tools':True,'context':16384},'cmd':f"admit-run ${{env.HEAVY_HOST_RESERVE_GB}} ${{env.HEAVY_MAX_CURRENT_GTT_GB}} -- llama-server --host 127.0.0.1 --port ${{PORT}} --model {s['model']}{mm} --ctx-size 16384 --parallel 1 --n-gpu-layers auto --fit on --fit-target ${{env.GPU_FIT_TARGET_MIB}} --fit-ctx ${{env.MIN_FIT_CONTEXT}} --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --jinja",'ttl':s['ttl']}
+ return {'name':s['name'],'description':s['description'],'capabilities':{'in':['text','image'],'out':['text'],'tools':True,'context':16384},'cmd':f"admit-run ${{env.HEAVY_HOST_RESERVE_GB}} ${{env.HEAVY_MAX_CURRENT_GTT_GB}} -- llama-server --host 127.0.0.1 --port ${{PORT}} --model {s['model']}{mm} --ctx-size 16384 --parallel 1 --n-gpu-layers auto --fit on --fit-target ${{env.GPU_FIT_TARGET_MIB}} --fit-ctx ${{env.MIN_FIT_CONTEXT}} --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --jinja{reasoning}",'ttl':s['ttl']}
 def edit_template(candidates,promote=False):
  p=ROOT/'templates/llama-swap.yaml';d=yaml.safe_load(p.read_text());models=d['models'];groups=d['routing']['router']['settings']['groups']['heavyweight-exclusive']['members']
  for cid in candidates:
@@ -30,14 +32,8 @@ def edit_template(candidates,promote=False):
    groups[:]=[x for x in groups if x!=candidate]
  p.write_text(yaml.safe_dump(d,sort_keys=False,allow_unicode=True,width=140))
 def edit_tests(candidates,promote=False):
- p=ROOT/'tests/models.yaml';d=yaml.safe_load(p.read_text());tests=d['tests']
- for cid in candidates:
-  spec=TARGETS[cid];candidate='candidate/'+cid.split('/',1)[1];base='llm/coder' if 'qwen38' in cid else 'llm/vision'
-  if promote:
-   tests.pop(candidate,None)
-  else:
-   tests[candidate]=copy.deepcopy(tests[base])
- p.write_text(yaml.safe_dump(d,sort_keys=False,allow_unicode=True,width=140))
+ # Upgrade tests use permanent role contracts in tests/models.yaml.
+ return
 def edit_registry(candidates,promote=False):
  if not promote:return
  p=ROOT/'registry/models.yaml';d=yaml.safe_load(p.read_text());models=d['models'];byid={m['id']:m for m in models}
@@ -54,24 +50,32 @@ def qualify(cid,spec,env,out):
  for testid in spec['tests']:
   start=time.monotonic();r=run([sys.executable,'tests/run.py',serve,'--spec-id',testid,'--base',base,'--key',key],check=False,capture=True,env=env);log=out/f"{serve.replace('/','__')}--{testid.replace('/','__')}.log";log.write_text(r.stdout+'\n'+r.stderr);latest=sorted((ROOT/'benchmark-results').glob(serve.replace('/','__')+'-*.json'),key=lambda p:p.stat().st_mtime)
   tps=None
+  state='runtime-fail';qualification={} ; error=None
   if latest:
-   data=json.loads(latest[-1].read_text());tps=data.get('response',{}).get('timings',{}).get('predicted_per_second')
-  results.append({'test':testid,'passed':r.returncode==0,'seconds':round(time.monotonic()-start,2),'generation_tps':tps,'log':str(log)})
+   data=json.loads(latest[-1].read_text());tps=data.get('response',{}).get('timings',{}).get('predicted_per_second');state=data.get('qualification_state','pass' if data.get('passed') else 'semantic-fail');qualification=data.get('qualification',{});error=data.get('error')
+  results.append({'test':testid,'role':spec['profile'],'passed':r.returncode==0,'state':state,'qualification':qualification,'error':error,'seconds':round(time.monotonic()-start,2),'generation_tps':tps,'log':str(log)})
   if r.returncode:return False,results
  # Speed gate uses any text-generation test with timings.
  speeds=[x['generation_tps'] for x in results if x['generation_tps'] is not None]
  return bool(speeds and min(speeds)>=spec['min_tps']),results
+def model_ready(cid,env):
+ r=subprocess.run([sys.executable,'scripts/model-manager.py','--track','all','--id',cid,'status','--json'],cwd=ROOT,text=True,capture_output=True,env=env)
+ if r.returncode!=0:return False
+ try:rows=json.loads(r.stdout).get('models',[])
+ except json.JSONDecodeError:return False
+ return bool(rows and rows[0].get('managed') and not rows[0].get('missing'))
 def main():
- p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--no-prune',action='store_true');p.add_argument('--minimum-free-gib',type=int,default=80);a=p.parse_args();candidates=list(TARGETS);env=envfile();stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S');work=ROOT/'upgrade-results'/stamp;files=['templates/llama-swap.yaml','config/llama-swap.yaml','tests/models.yaml','tests/planned-models.yaml','registry/models.yaml']
+ p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--no-prune',action='store_true');p.add_argument('--refresh-models',action='store_true',help='download registered artifacts again');p.add_argument('--minimum-free-gib',type=int,default=80);a=p.parse_args();candidates=list(TARGETS);env=envfile();ready={cid:model_ready(cid,env) for cid in candidates};stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S');work=ROOT/'upgrade-results'/stamp;files=['templates/llama-swap.yaml','config/llama-swap.yaml','tests/models.yaml','tests/planned-models.yaml','registry/models.yaml']
  print('UPGRADE PLAN',*candidates,sep='\n - ')
- print(f' - minimum free disk: {a.minimum_free_gib} GiB')
+ print(f' - minimum free disk for downloads: {a.minimum_free_gib} GiB')
+ for cid in candidates:print(f" - {cid}: {'refresh' if a.refresh_models else 'reuse' if ready[cid] else 'download'}")
  print(' - old coder and vision files move to quarantine only after all tests pass')
  if not a.apply:print('\nDry run only. Re-run with --apply.');return
  # Runtime scripts must work in an rsync deployment with no Git metadata.
  missing=[f for f in files if not (ROOT/f).is_file()]
  if missing:raise SystemExit('Required deployment files are missing: '+', '.join(missing))
  model_dir=Path(env.get('MODEL_DIR',ROOT/'models'));free=shutil.disk_usage(model_dir).free/1024**3
- if free<a.minimum_free_gib:raise SystemExit(f'Need at least {a.minimum_free_gib} GiB free in MODEL_DIR; found {free:.1f} GiB')
+ if (a.refresh_models or not all(ready.values())) and free<a.minimum_free_gib:raise SystemExit(f'Need at least {a.minimum_free_gib} GiB free for model downloads; found {free:.1f} GiB')
  work.mkdir(parents=True);backup=work/'backup';backup.mkdir()
  # Save a complete transaction snapshot. This is the rollback source in a deployment directory.
  manifest={'created':stamp,'root':str(ROOT),'model_dir':str(model_dir),'files':files,'candidates':candidates}
@@ -80,7 +84,10 @@ def main():
  (backup/'transaction.json').write_text(json.dumps(manifest,indent=2))
  try:
   run(['./scripts/ai-stack','protocol','exposed'])
-  for cid in candidates:run([sys.executable,'scripts/model-manager.py','--track','all','--id',cid,'sync'],env=env)
+  for cid in candidates:
+   cmd=[sys.executable,'scripts/model-manager.py','--track','all','--id',cid,'sync']
+   if a.refresh_models:cmd.append('--force')
+   run(cmd,env=env)
   edit_template(candidates);edit_tests(candidates);run(['./scripts/generate-config']);run(['./scripts/validate']);run(['docker','compose','up','-d','--force-recreate','gateway']);time.sleep(5)
   qualification={};ok=True
   for cid in candidates:

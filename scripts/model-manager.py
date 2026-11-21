@@ -72,9 +72,23 @@ def status(models,base,as_json=False):
  for x in result['orphan_files'][:30]:print(' ORPHAN',human(x['bytes']),x['path'])
  if len(orphan)>30:print(' ...',len(orphan)-30,'more')
  return result
-def hf_download(m,base):
+def missing_patterns(m,base):
+ dest=base/rel_local(m);missing=[]
+ for pat in expected_patterns(m):
+  text=str(pat)
+  if any(c in text for c in '*?'):
+   if not any(x.is_file() for x in dest.glob(text)):missing.append(text)
+  else:
+   target=dest/(Path(text).name if m.get('flatten') else text)
+   if not target.is_file():missing.append(text)
+ return missing
+def hf_download(m,base,force=False):
  pats=expected_patterns(m)
  if not pats:print('SKIP unmanaged artifact specification:',m['id']);return
+ missing=missing_patterns(m,base)
+ if not force and not missing:
+  print('REUSE',m['id'],'all registered artifacts are present')
+  return
  source=m.get('source');
  if not source or '/' not in source:raise RuntimeError(f"{m['id']}: no downloadable Hugging Face source")
  dest=base/rel_local(m);stage=base/'.staging'/m['id'].replace('/','__');shutil.rmtree(stage,ignore_errors=True);stage.mkdir(parents=True,exist_ok=True)
@@ -113,12 +127,12 @@ def purge(base,older,apply):
 def main():
  p=argparse.ArgumentParser();p.add_argument('--track',default='active',choices=['active','balanced','experimental','staged','all']);p.add_argument('--id',action='append',default=[]);sub=p.add_subparsers(dest='cmd',required=True)
  s=sub.add_parser('status');s.add_argument('--json',action='store_true')
- sub.add_parser('sync');q=sub.add_parser('prune');q.add_argument('--apply',action='store_true');u=sub.add_parser('purge');u.add_argument('--older-than-days',type=int,default=14);u.add_argument('--apply',action='store_true')
+ sync=sub.add_parser('sync');sync.add_argument('--force',action='store_true');q=sub.add_parser('prune');q.add_argument('--apply',action='store_true');u=sub.add_parser('purge');u.add_argument('--older-than-days',type=int,default=14);u.add_argument('--apply',action='store_true')
  a=p.parse_args();base=root_dir();base.mkdir(parents=True,exist_ok=True);models=selected(a.track,a.id)
  if a.cmd=='status':status(models,base,a.json)
  elif a.cmd=='sync':
   if shutil.which('hf') is None:raise SystemExit('Install huggingface_hub CLI: python3 -m pip install -U huggingface_hub')
-  for m in models:hf_download(m,base)
+  for m in models:hf_download(m,base,a.force)
   status(models,base)
  elif a.cmd=='prune':quarantine(base,models,a.apply)
  elif a.cmd=='purge':purge(base,a.older_than_days,a.apply)

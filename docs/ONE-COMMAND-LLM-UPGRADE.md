@@ -15,13 +15,14 @@ The script does these actions in order:
 2. Downloads both candidates through the registry manager.
 3. Adds temporary `candidate/*` endpoints.
 4. Recreates the gateway.
-5. Runs role tests for coding, chat, and vision.
-6. Requires at least 7.5 tok/s for each candidate.
-7. Stops if a semantic or speed test fails.
-8. Restores the previous configuration after a failure.
-9. Replaces the stable coder and vision endpoints only after all tests pass.
-10. Runs the exposed-model and Open WebUI protocols.
-11. Moves only the old coder and vision model directories to quarantine.
+5. Applies a role-specific runtime profile.
+6. Runs independent upgrade contracts for coding, chat, and vision.
+7. Requires at least 7.5 tok/s for each candidate.
+8. Stops if a semantic, response-contract, or speed test fails.
+9. Restores the previous configuration after a failure.
+10. Replaces the stable coder and vision endpoints only after all tests pass.
+11. Runs the exposed-model and Open WebUI protocols.
+12. Moves only the old coder and vision model directories to quarantine.
 
 The script does not permanently delete a model file.
 
@@ -29,7 +30,9 @@ The script does not permanently delete a model file.
 
 Run this procedure in the deployed runtime directory. The directory does not need a `.git` directory.
 
-You can keep the source repository in a different location and use `rsync` to update the deployment directory. Exclude machine-local data such as `.env`, models, outputs, state, benchmark results, and upgrade results.
+You can keep the source repository in a different location. Use `rsync` to update the deployment directory.
+
+Exclude `.env`, models, outputs, state, benchmark results, and upgrade results.
 
 The upgrade script creates its own file snapshot for rollback.
 
@@ -86,6 +89,23 @@ This command does not change files or download models.
 python3 scripts/upgrade-target-llms.py --apply
 ```
 
+The script checks the registered artifact paths before it downloads a model.
+
+- It prints `reuse` when all registered files are present.
+- It prints `download` when one or more registered files are missing.
+- A failed qualification keeps the downloaded candidate files for the next run.
+- A test retry does not download complete model files again.
+
+Use a forced refresh only when the local artifacts are damaged or the registry points to a new revision:
+
+```bash
+python3 scripts/upgrade-target-llms.py \
+  --apply \
+  --refresh-models
+```
+
+> **Warning:** A forced refresh can transfer tens of gibibytes. Do not use it for a normal test retry.
+
 Use this command to keep old files in place after promotion:
 
 ```bash
@@ -118,16 +138,30 @@ MODEL_DIR/llm/gemma4-31b-q5/
 
 ## Qualification tests
 
-Qwen3.8 runs these test specifications:
+The upgrade tests do not copy the incumbent model tests. They use stable role contracts.
 
-- `llm/coder`
-- `llm/fast`
-- `llm/vision`
+Qwen3.8 uses the `coder` runtime profile and runs:
 
-Gemma 4 runs these test specifications:
+- `upgrade/coder` with 1,536 output tokens
+- `upgrade/chat` with 128 output tokens
+- `upgrade/vision` with 256 output tokens
 
-- `llm/vision`
-- `llm/fast`
+Gemma 4 uses the `vision` runtime profile and runs:
+
+- `upgrade/vision` with 256 output tokens
+- `upgrade/chat` with 128 output tokens
+
+The `coder` and `vision` runtime profiles disable reasoning. These basic contracts require the final answer in `message.content`. They also require `finish_reason: stop`.
+
+The test result separates these layers:
+
+- Runtime start
+- Role capability
+- OpenAI response contract
+- Performance
+- Unload lifecycle
+
+A correct answer in `reasoning_content` proves capability for diagnosis. It does not pass the response contract. Open WebUI requires usable final content.
 
 The script records logs and results under:
 
@@ -235,3 +269,17 @@ docker compose up -d --force-recreate gateway
 If a candidate fails before promotion, the script restores the configuration backup and recreates the gateway.
 
 Downloaded candidate files remain in `MODEL_DIR`. This permits diagnosis and a later retest. Use the model manager to quarantine them after review.
+
+## Qualification states
+
+Each benchmark result has a `qualification_state` value:
+
+- `pass`
+- `runtime-fail`
+- `semantic-fail`
+- `capability-pass-contract-fail`
+- `lifecycle-fail`
+
+A vision model can identify the image in `reasoning_content` and still fail the response contract.
+
+Correct the candidate runtime profile and run the test again. Do not classify this result as a vision-capability failure.
