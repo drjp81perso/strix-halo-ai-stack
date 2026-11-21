@@ -1,0 +1,43 @@
+# Normalize text in Git and use LF in each checkout.
+* text=auto eol=lf
+
+# Linux and container programs must use LF.
+*.sh text eol=lf
+*.py text eol=lf
+scripts/* text eol=lf
+Dockerfile text eol=lf
+
+# Configuration and documentation use LF on all platforms.
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.env text eol=lf
+*.example text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+
+# Keep binary files unchanged.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.wav binary
+*.mp3 binary
+*.flac binary
+*.ogg binary
+*.gguf binary
+*.safetensors binary
+*.bin binary
+*.onnx binary
+*.pt binary
+*.pth binary
+*.ckpt binary
+*.sqlite binary
+*.db binary
+*.tar binary
+*.gz binary
+*.zip binary
+*.7z binary
