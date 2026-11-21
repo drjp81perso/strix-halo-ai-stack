@@ -56,6 +56,7 @@ Only active models appear in `/v1/models`. Candidate models remain hidden until 
 | [Model selection tools](docs/MODEL-SELECTION-TOOLS.md) | Use `whichllm` and FreeLLMArena to make a candidate list. |
 | [Model lifecycle](docs/MODEL-LIFECYCLE.md) | Download, replace, quarantine, restore, and purge model files. |
 | [One-command LLM upgrade](docs/ONE-COMMAND-LLM-UPGRADE.md) | Qualify and promote Qwen3.8-27B Q5 and Gemma 4 31B Q5. |
+| [Source and deployment directories](docs/SOURCE-AND-DEPLOYMENT.md) | Synchronize a Git source tree to a Git-free runtime directory. |
 | [Automated test protocol](docs/AUTOMATED-TEST-PROTOCOL.md) | Test configuration, models, aliases, and Open WebUI behavior. |
 | [Operations](docs/OPERATIONS.md) | Review measured results and troubleshooting information. |
 

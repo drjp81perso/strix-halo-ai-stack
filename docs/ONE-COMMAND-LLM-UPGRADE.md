@@ -25,19 +25,34 @@ The script does these actions in order:
 
 The script does not permanently delete a model file.
 
+## Deployment model
+
+Run this procedure in the deployed runtime directory. The directory does not need a `.git` directory.
+
+You can keep the source repository in a different location and use `rsync` to update the deployment directory. Exclude machine-local data such as `.env`, models, outputs, state, benchmark results, and upgrade results.
+
+The upgrade script creates its own file snapshot for rollback.
+
 ## Prerequisites
 
-- Commit or stash repository changes.
+- Synchronize the tested source files to the deployment directory.
 - Install the Hugging Face CLI.
 - Start Docker.
 - Confirm the current stack passes the exposed protocol.
 - Keep at least 80 GiB free in `MODEL_DIR`.
 - Review the model licenses.
 
-Check the working tree:
+Check that the required deployment files exist:
 
 ```bash
-git status --short
+for file in \
+  templates/llama-swap.yaml \
+  config/llama-swap.yaml \
+  tests/models.yaml \
+  tests/planned-models.yaml \
+  registry/models.yaml; do
+  test -f "$file" || echo "Missing: $file"
+done
 ```
 
 Install the Hugging Face CLI:
@@ -87,7 +102,7 @@ python3 scripts/upgrade-target-llms.py \
   --minimum-free-gib 120
 ```
 
-> **Warning:** Do not use `--allow-dirty` for a normal upgrade. A clean Git working tree is part of the rollback method.
+> **Warning:** Do not edit the managed configuration files while the upgrade is running. The script uses a local transaction snapshot for rollback.
 
 ## Expected download locations
 
@@ -126,6 +141,8 @@ The qualification report is:
 upgrade-results/YYYYMMDD-HHMMSS/qualification.json
 ```
 
+See `docs/UPGRADE-RESULTS.md` for commands that show performance, model output, and explicit failure reasons.
+
 ## Promotion result
 
 The public model IDs remain stable:
@@ -160,21 +177,38 @@ Keep the quarantine for at least 14 days.
 
 ## Rollback after a successful upgrade
 
-1. Restore the prior Git revision.
-2. Restore the model directories from quarantine.
-3. Regenerate the configuration.
-4. Recreate the gateway.
-5. Run the exposed protocol.
+1. Select the applicable transaction directory.
+2. Restore the configuration snapshot.
+3. Restore the model directories from quarantine.
+4. Regenerate the configuration.
+5. Recreate the gateway.
+6. Run the exposed protocol.
 
-Example:
+List transactions:
 
 ```bash
-git log --oneline -5
-git checkout PREVIOUS_COMMIT -- \
-  templates/llama-swap.yaml \
-  config/llama-swap.yaml \
-  tests/models.yaml \
-  tests/planned-models.yaml \
+find upgrade-results \
+  -mindepth 1 \
+  -maxdepth 1 \
+  -type d \
+  -printf '%f\n' \
+  | sort -r
+```
+
+Restore the saved files. Replace the timestamp:
+
+```bash
+TX="upgrade-results/YYYYMMDD-HHMMSS"
+
+cp -a "$TX/backup/templates/llama-swap.yaml" \
+  templates/llama-swap.yaml
+cp -a "$TX/backup/config/llama-swap.yaml" \
+  config/llama-swap.yaml
+cp -a "$TX/backup/tests/models.yaml" \
+  tests/models.yaml
+cp -a "$TX/backup/tests/planned-models.yaml" \
+  tests/planned-models.yaml
+cp -a "$TX/backup/registry/models.yaml" \
   registry/models.yaml
 ```
 

@@ -62,16 +62,22 @@ def qualify(cid,spec,env,out):
  speeds=[x['generation_tps'] for x in results if x['generation_tps'] is not None]
  return bool(speeds and min(speeds)>=spec['min_tps']),results
 def main():
- p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--no-prune',action='store_true');p.add_argument('--allow-dirty',action='store_true');p.add_argument('--minimum-free-gib',type=int,default=80);a=p.parse_args();candidates=list(TARGETS);env=envfile();stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S');work=ROOT/'upgrade-results'/stamp;files=['templates/llama-swap.yaml','config/llama-swap.yaml','tests/models.yaml','tests/planned-models.yaml','registry/models.yaml']
+ p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--no-prune',action='store_true');p.add_argument('--minimum-free-gib',type=int,default=80);a=p.parse_args();candidates=list(TARGETS);env=envfile();stamp=datetime.datetime.now().strftime('%Y%m%d-%H%M%S');work=ROOT/'upgrade-results'/stamp;files=['templates/llama-swap.yaml','config/llama-swap.yaml','tests/models.yaml','tests/planned-models.yaml','registry/models.yaml']
  print('UPGRADE PLAN',*candidates,sep='\n - ')
  print(f' - minimum free disk: {a.minimum_free_gib} GiB')
  print(' - old coder and vision files move to quarantine only after all tests pass')
  if not a.apply:print('\nDry run only. Re-run with --apply.');return
- if not a.allow_dirty and run(['git','status','--porcelain'],capture=True).stdout.strip():raise SystemExit('Working tree is not clean. Commit changes or use --allow-dirty.')
+ # Runtime scripts must work in an rsync deployment with no Git metadata.
+ missing=[f for f in files if not (ROOT/f).is_file()]
+ if missing:raise SystemExit('Required deployment files are missing: '+', '.join(missing))
  model_dir=Path(env.get('MODEL_DIR',ROOT/'models'));free=shutil.disk_usage(model_dir).free/1024**3
  if free<a.minimum_free_gib:raise SystemExit(f'Need at least {a.minimum_free_gib} GiB free in MODEL_DIR; found {free:.1f} GiB')
  work.mkdir(parents=True);backup=work/'backup';backup.mkdir()
- for f in files:shutil.copy2(ROOT/f,backup/Path(f).name)
+ # Save a complete transaction snapshot. This is the rollback source in a deployment directory.
+ manifest={'created':stamp,'root':str(ROOT),'model_dir':str(model_dir),'files':files,'candidates':candidates}
+ for f in files:
+  src=ROOT/f;dst=backup/f;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
+ (backup/'transaction.json').write_text(json.dumps(manifest,indent=2))
  try:
   run(['./scripts/ai-stack','protocol','exposed'])
   for cid in candidates:run([sys.executable,'scripts/model-manager.py','--track','all','--id',cid,'sync'],env=env)
@@ -96,7 +102,7 @@ def main():
  except Exception as e:
   print('UPGRADE FAILED:',e,file=sys.stderr);print('RESTORING CONFIGURATION',file=sys.stderr)
   for f in files:
-   src=backup/Path(f).name
-   if src.exists():shutil.copy2(src,ROOT/f)
+   src=backup/f;dst=ROOT/f
+   if src.exists():dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
   run(['./scripts/generate-config'],check=False);run(['docker','compose','up','-d','--force-recreate','gateway'],check=False);raise
 if __name__=='__main__':main()
