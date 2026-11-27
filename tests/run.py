@@ -123,9 +123,15 @@ def save_result(model,spec_id,kind,status,elapsed,before,loaded,running,after,da
 def main():
  p=argparse.ArgumentParser();p.add_argument('model');p.add_argument('--spec-id');p.add_argument('--base',required=True);p.add_argument('--key',required=True);a=p.parse_args();spec_id=a.spec_id or a.model;spec=yaml.safe_load((ROOT/'tests/models.yaml').read_text())['tests'][spec_id];kind=spec['kind'];unload(a.base,a.key);before=metrics(a.base,a.key);start=time.monotonic();st=0;data={};loaded={};running={'running':[]};after={'running':[]};error=None
  try:
-  if kind in {'exact-chat','python-code','bayes-reasoning','vision-shape'}:st,b,_=chat(a.base,a.key,a.model,spec);data=json.loads(b)
-  elif kind=='embedding-similarity':st,b,_=request(a.base,a.key,'/v1/embeddings',{'model':a.model,'input':spec['inputs']});data=json.loads(b)
-  elif kind=='rerank':st,b,_=request(a.base,a.key,'/v1/rerank',{'model':a.model,'query':spec['query'],'documents':spec['documents']});data=json.loads(b)
+  if kind in {'exact-chat','python-code','bayes-reasoning','vision-shape'}:
+   st,b,_=chat(a.base,a.key,a.model,spec);data=json.loads(b)
+   if st!=200:raise RuntimeError(f'chat HTTP {st}: {error_message(b)}')
+  elif kind=='embedding-similarity':
+   st,b,_=request(a.base,a.key,'/v1/embeddings',{'model':a.model,'input':spec['inputs']});data=json.loads(b)
+   if st!=200:raise RuntimeError(f'embeddings HTTP {st}: {error_message(b)}')
+  elif kind=='rerank':
+   st,b,_=request(a.base,a.key,'/v1/rerank',{'model':a.model,'query':spec['query'],'documents':spec['documents']});data=json.loads(b)
+   if st!=200:raise RuntimeError(f'rerank HTTP {st}: {error_message(b)}')
   elif kind=='tts':
    st,b,_=request(a.base,a.key,'/v1/audio/speech',{'model':a.model,'input':spec['text'],'voice':spec['voice']})
    if st!=200:raise RuntimeError(f'TTS HTTP {st}: {error_message(b)}')

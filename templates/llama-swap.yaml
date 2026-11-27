@@ -30,13 +30,13 @@ security:
 models:
   llm/fast:
     name: "Qwen 3.5 35B-A3B — Fast Agent"
-    description: "Default tool-capable MoE assistant; Q5_K_M; 32K context"
-    capabilities: { in: [text], out: [text], tools: true, context: 32768 }
+    description: "Default tool-capable MoE assistant; Q5_K_M; ${profile.LLM_FAST_CONTEXT_SIZE}-token context"
+    capabilities: { in: [text], out: [text], tools: true, context: "${profile.LLM_FAST_CONTEXT_SIZE}" }
     cmd: >-
       admit-run ${env.HEAVY_HOST_RESERVE_GB} ${env.HEAVY_MAX_CURRENT_GTT_GB} --
       llama-server --host 127.0.0.1 --port ${PORT}
       --model /models/llm/qwen35/Qwen3.5-35B-A3B-Q5_K_M.gguf
-      --ctx-size 32768 --parallel 1 --n-gpu-layers 999
+      --ctx-size ${profile.LLM_FAST_CONTEXT_SIZE} --parallel 1 --n-gpu-layers 999
       --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0
       --jinja --reasoning off
     ttl: 1800
@@ -44,33 +44,34 @@ models:
 
   llm/reasoning:
     name: "Qwen 3.5 122B-A10B — Strong Reasoner"
-    description: "Large Q4_K_M MoE; 16K context; automatic GPU/host fitting"
-    capabilities: { in: [text], out: [text], tools: true, context: 16384 }
+    description: "Large multimodal Q4_K_M MoE; ${profile.LLM_REASONING_CONTEXT_SIZE}-token context; matching BF16 vision projector"
+    capabilities: { in: [text, image], out: [text], tools: true, context: "${profile.LLM_REASONING_CONTEXT_SIZE}" }
     cmd: >-
       admit-run ${env.HEAVY_HOST_RESERVE_GB} ${env.HEAVY_MAX_CURRENT_GTT_GB} --
       llama-server --host 127.0.0.1 --port ${PORT}
-      --model /models/llm/qwen122/Qwen3.5-122B-A10B-Q4_K_M-00001-of-00003.gguf
-      --ctx-size 16384 --parallel 1 --n-gpu-layers auto
-      --fit on --fit-target ${env.GPU_FIT_TARGET_MIB} --fit-ctx ${env.MIN_FIT_CONTEXT}
+      --model /models/llm/qwen122/Q4_K_M/Qwen3.5-122B-A10B-Q4_K_M-00001-of-00003.gguf
+      --mmproj /models/llm/qwen122/mmproj-BF16.gguf
+      --ctx-size ${profile.LLM_REASONING_CONTEXT_SIZE} --parallel 1 --n-gpu-layers auto
+      --fit on --fit-target ${env.GPU_FIT_TARGET_MIB} --fit-ctx ${profile.LLM_REASONING_FIT_CONTEXT}
       --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0
       --jinja
       --reasoning on
       --reasoning-effort low
-      --reasoning-budget 768
+      --reasoning-budget ${profile.LLM_REASONING_BUDGET}
       --reasoning-budget-message "Reasoning budget reached. Use the values already computed above, verify the numerator once, and provide only the concise final answer."
     ttl: 600
     aliases: [reasoning-strong]
 
   llm/coder:
     name: "Qwen 3 Coder Next — Coding Agent"
-    description: "Q5_K_M coding MoE; 32K context; automatic GPU/host fitting"
-    capabilities: { in: [text], out: [text], tools: true, context: 32768 }
+    description: "Q5_K_M coding MoE; ${profile.LLM_CODER_CONTEXT_SIZE}-token context; automatic GPU/host fitting"
+    capabilities: { in: [text], out: [text], tools: true, context: "${profile.LLM_CODER_CONTEXT_SIZE}" }
     cmd: >-
       admit-run ${env.HEAVY_HOST_RESERVE_GB} ${env.HEAVY_MAX_CURRENT_GTT_GB} --
       llama-server --host 127.0.0.1 --port ${PORT}
       --model /models/llm/coder/Qwen3-Coder-Next-Q5_K_M-00001-of-00004.gguf
-      --ctx-size 32768 --parallel 1 --n-gpu-layers auto
-      --fit on --fit-target ${env.GPU_FIT_TARGET_MIB} --fit-ctx ${env.MIN_FIT_CONTEXT}
+      --ctx-size ${profile.LLM_CODER_CONTEXT_SIZE} --parallel 1 --n-gpu-layers auto
+      --fit on --fit-target ${env.GPU_FIT_TARGET_MIB} --fit-ctx ${profile.LLM_CODER_FIT_CONTEXT}
       --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0
       --jinja
     ttl: 900
@@ -79,13 +80,14 @@ models:
   llm/vision:
     name: "Qwen 3 VL 32B — Vision"
     description: "Q4_K_M vision-language model with Q8 projector"
-    capabilities: { in: [text, image, video], out: [text], tools: true, context: 32768 }
+    capabilities: { in: [text, image, video], out: [text], tools: true, context: "${profile.LLM_VISION_CONTEXT_SIZE}" }
     cmd: >-
       admit-run ${env.HEAVY_HOST_RESERVE_GB} ${env.HEAVY_MAX_CURRENT_GTT_GB} --
       llama-server --host 127.0.0.1 --port ${PORT}
       --model /models/vision/qwen3vl/Qwen3VL-32B-Instruct-Q4_K_M.gguf
       --mmproj /models/vision/qwen3vl/mmproj-Qwen3VL-32B-Instruct-Q8_0.gguf
-      --ctx-size 32768 --parallel 1 --n-gpu-layers 999
+      --ctx-size ${profile.LLM_VISION_CONTEXT_SIZE} --parallel 1 --n-gpu-layers auto
+      --fit on --fit-target ${env.GPU_FIT_TARGET_MIB} --fit-ctx ${profile.LLM_VISION_FIT_CONTEXT}
       --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0
       --jinja
     ttl: 900

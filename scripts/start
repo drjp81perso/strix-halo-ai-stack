@@ -4,9 +4,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd); cd "$ROOT"
 [[ -f .env ]] || { cp .env.example .env; echo 'Created .env; edit it and rerun.' >&2; exit 2; }
 ./scripts/preflight
 ./scripts/generate-config --check
-docker compose build --pull
-docker compose run --rm --entrypoint /usr/local/bin/check-runtime-flags gateway
+./scripts/compose-safe build --pull
+./scripts/compose-safe run --rm --entrypoint /usr/local/bin/check-runtime-flags gateway
 # Recreate so changes in .env/Compose environment reach the gateway.
-docker compose up -d --force-recreate
+./scripts/compose-safe up -d --force-recreate
 sleep 3
-docker compose ps
+./scripts/compose-safe ps

@@ -298,3 +298,9 @@ See [Model roster](docs/MODEL-ROSTER.md) for the current state.
 - Use the GitHub issue templates for bugs, model candidates, and documentation changes.
 - Read [Security policy](SECURITY.md) before you report a vulnerability or an exposed credential.
 - Follow the [Code of conduct](CODE_OF_CONDUCT.md).
+
+## Model runtime configuration
+
+See [Model runtime configuration](docs/MODEL-RUNTIME-CONFIG.md).
+
+See [Environment handling](docs/ENVIRONMENT.md).

@@ -4,7 +4,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 python3 - "$ROOT" "$@" <<'PY'
 """Generate config/llama-swap.yaml from the canonical template with policy checks."""
 from pathlib import Path
-import argparse, shlex, sys, yaml
+import argparse, os, re, shlex, sys, yaml
 
 root = Path(sys.argv[1])
 template = root / "templates/llama-swap.yaml"
@@ -15,7 +15,31 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--check", action="store_true", help="verify output is current without rewriting it")
 args = parser.parse_args(sys.argv[2:])
 
-raw = template.read_text()
+template_raw = template.read_text()
+def load_values(path):
+    values = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value.strip().strip('"').strip("'")
+    return values
+
+defaults = load_values(root / ".env.example")
+values = {**defaults, **load_values(root / ".env"), **os.environ}
+missing = []
+def substitute(match):
+    key = match.group(1)
+    value = values.get(key)
+    if value is None or value == "":
+        missing.append(key)
+        return match.group(0)
+    return value
+raw = re.sub(r'"\$\{profile\.([A-Z0-9_]+)\}"', substitute, template_raw)
+raw = re.sub(r"\$\{profile\.([A-Z0-9_]+)\}", substitute, raw)
+if missing:
+    raise SystemExit("Missing model profile variables: " + ", ".join(sorted(set(missing))))
 config = yaml.safe_load(raw)
 policy = yaml.safe_load(policy_path.read_text())
 forbidden = set(policy["llama_server"]["forbidden_flags"])

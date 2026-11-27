@@ -10,15 +10,15 @@ errors=[];vals={}
 for key in required:
  val=os.environ.get(key,'');vals[key]='***' if key=='AI_API_KEY' and val else val
  if not val:errors.append(f'missing environment variable: {key}')
-  elif key=='AI_API_KEY':
-   if val=='sk-change-me' or val=='replace-with-generated-key-minimum-24-characters':errors.append('AI_API_KEY still uses a public placeholder')
-   if len(val)<24:errors.append('AI_API_KEY must contain at least 24 characters')
-  elif not val.isdigit():errors.append(f'{key} must be a non-negative integer, got {val!r}')
+ elif key=='AI_API_KEY':
+  if val=='sk-change-me' or val=='replace-with-generated-key-minimum-24-characters':errors.append('AI_API_KEY still uses a public placeholder')
+  if len(val)<24:errors.append('AI_API_KEY must contain at least 24 characters')
+ elif not val.isdigit():errors.append(f'{key} must be a non-negative integer, got {val!r}')
 if os.environ.get('GLOBAL_CONCURRENCY_LIMIT','0').isdigit() and int(os.environ.get('GLOBAL_CONCURRENCY_LIMIT','0'))<2:errors.append('GLOBAL_CONCURRENCY_LIMIT must be >=2 for Open WebUI burst testing (recommended: 4)')
 cfg=(root/'config/llama-swap.yaml').read_text()
-for key in required[1:]:
+for key in [x for x in required[1:] if x!='MIN_FIT_CONTEXT']:
  if '${env.'+key+'}' not in cfg:errors.append(f'generated config does not reference env policy: {key}')
-print(json.dumps({'environment':vals,'recommended_openwebui_limit':4,'note':'After changing .env, run docker compose up -d --force-recreate gateway; restart does not refresh environment.'},indent=2))
+print(json.dumps({'environment':vals,'recommended_openwebui_limit':4,'note':'Use model-config apply for per-model context changes. Recreate the gateway only for container-environment changes.'},indent=2))
 if errors:
  for e in errors:print('ERROR:',e,file=sys.stderr)
  raise SystemExit(1)

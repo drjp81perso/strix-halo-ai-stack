@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Print shell commands that remove all variables defined in the project .env.
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+ENV_FILE="$ROOT/.env"
+[[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE" >&2; exit 2; }
+while IFS= read -r line; do
+  [[ "$line" =~ ^[[:space:]]*# || ! "$line" =~ = ]] && continue
+  key=${line%%=*}; key=${key//[[:space:]]/}
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && printf 'unset %q\n' "$key"
+done <"$ENV_FILE" | sort -u

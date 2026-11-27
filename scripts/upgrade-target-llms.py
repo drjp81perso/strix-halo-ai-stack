@@ -17,10 +17,12 @@ def envfile():
     k,v=l.split('=',1);d[k]=v.strip().strip('"').strip("'")
  return d
 def block(mid,s):
- # Candidate profiles are role-specific. Basic coder and vision contracts require visible final output.
+ # Candidate profiles are role-specific. Runtime tuning comes from .env.
+ prefix='LLM_CODER' if s['profile']=='coder' else 'LLM_VISION'
+ context=f'${{profile.{prefix}_CONTEXT_SIZE}}';fit=f'${{profile.{prefix}_FIT_CONTEXT}}'
  reasoning=' --reasoning off' if s['profile'] in {'coder','vision'} else ''
  mm=f" --mmproj {s['mmproj']}" if s.get('mmproj') else ''
- return {'name':s['name'],'description':s['description'],'capabilities':{'in':['text','image'],'out':['text'],'tools':True,'context':16384},'cmd':f"admit-run ${{env.HEAVY_HOST_RESERVE_GB}} ${{env.HEAVY_MAX_CURRENT_GTT_GB}} -- llama-server --host 127.0.0.1 --port ${{PORT}} --model {s['model']}{mm} --ctx-size 16384 --parallel 1 --n-gpu-layers auto --fit on --fit-target ${{env.GPU_FIT_TARGET_MIB}} --fit-ctx ${{env.MIN_FIT_CONTEXT}} --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --jinja{reasoning}",'ttl':s['ttl']}
+ return {'name':s['name'],'description':s['description'],'capabilities':{'in':['text','image'],'out':['text'],'tools':True,'context':context},'cmd':f"admit-run ${{env.HEAVY_HOST_RESERVE_GB}} ${{env.HEAVY_MAX_CURRENT_GTT_GB}} -- llama-server --host 127.0.0.1 --port ${{PORT}} --model {s['model']}{mm} --ctx-size {context} --parallel 1 --n-gpu-layers auto --fit on --fit-target ${{env.GPU_FIT_TARGET_MIB}} --fit-ctx {fit} --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --jinja{reasoning}",'ttl':s['ttl']}
 def edit_template(candidates,promote=False):
  p=ROOT/'templates/llama-swap.yaml';d=yaml.safe_load(p.read_text());models=d['models'];groups=d['routing']['router']['settings']['groups']['heavyweight-exclusive']['members']
  for cid in candidates:

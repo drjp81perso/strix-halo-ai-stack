@@ -65,3 +65,9 @@ tests:
     max_tokens: 128
     prompt: 'Reply with exactly: candidate API ready'
     expected: candidate API ready
+  llm/reasoning-vision:
+    kind: vision-shape
+    role: multimodal-reasoning
+    max_tokens: 2048
+    prompt: Examine the image and identify the colored geometric shape. Provide the final answer in one short sentence.
+    fixture: tests/fixtures/red-square.png
