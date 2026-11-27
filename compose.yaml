@@ -28,7 +28,7 @@ services:
       TTS_MAX_CURRENT_GTT_GB: "${TTS_MAX_CURRENT_GTT_GB:-12}"
       GPU_FIT_TARGET_MIB: "${GPU_FIT_TARGET_MIB:-4096}"
       MIN_FIT_CONTEXT: "${MIN_FIT_CONTEXT:-16384}"
-      GLOBAL_CONCURRENCY_LIMIT: "${GLOBAL_CONCURRENCY_LIMIT:-4}"
+      GLOBAL_CONCURRENCY_LIMIT: "${GLOBAL_CONCURRENCY_LIMIT:?Set GLOBAL_CONCURRENCY_LIMIT in the deployment .env file}"
     volumes:
       - ./config/llama-swap.yaml:/etc/llama-swap/config/config.yaml:ro
       - ./config/audiocpp.json:/etc/llama-swap/audiocpp.json:ro

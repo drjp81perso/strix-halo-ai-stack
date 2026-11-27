@@ -66,7 +66,7 @@ Only active models appear in `/v1/models`. Candidate models remain hidden until 
 
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose-v2 python3-pip vulkan-tools jq
+sudo apt install -y docker.io docker-compose-v2 python3-pip python3-yaml vulkan-tools jq
 sudo usermod -aG docker,video,render "$USER"
 ```
 
@@ -94,7 +94,7 @@ Generate an API key:
 printf 'sk-%s\n' "$(openssl rand -base64 48 | tr -d '\n')"
 ```
 
-Set the result as `AI_API_KEY` in `.env`.
+Set the result as `AI_API_KEY` in `.env`. The key must contain at least 24 characters and must not use `sk-change-me`.
 
 ### 3. Set the model directory
 
@@ -298,3 +298,9 @@ See [Model roster](docs/MODEL-ROSTER.md) for the current state.
 - Use the GitHub issue templates for bugs, model candidates, and documentation changes.
 - Read [Security policy](SECURITY.md) before you report a vulnerability or an exposed credential.
 - Follow the [Code of conduct](CODE_OF_CONDUCT.md).
+
+## Model runtime configuration
+
+See [Model runtime configuration](docs/MODEL-RUNTIME-CONFIG.md).
+
+See [Environment handling](docs/ENVIRONMENT.md).

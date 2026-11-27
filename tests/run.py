@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import argparse,base64,json,math,mimetypes,os,re,struct,sys,time,urllib.request,urllib.error,uuid,wave,yaml
+import argparse,ast,base64,json,math,mimetypes,os,re,struct,sys,time,urllib.request,urllib.error,uuid,wave,yaml
 ROOT=Path(__file__).resolve().parents[1]
 def plain(s):
  s=re.sub(r'\\(?:d|t)?frac\s*\{\s*([^{}]+?)\s*\}\s*\{\s*([^{}]+?)\s*\}',lambda m:f'{m.group(1).strip()}/{m.group(2).strip()}',s)
@@ -35,6 +35,19 @@ def chat(base,key,mid,spec):
   enc=base64.b64encode((ROOT/spec['fixture']).read_bytes()).decode();content=[{'type':'text','text':content},{'type':'image_url','image_url':{'url':f'data:image/png;base64,{enc}'}}]
  return request(base,key,'/v1/chat/completions',{'model':mid,'messages':[{'role':'user','content':content}],'temperature':0,'max_tokens':spec['max_tokens'],'stream':False})
 def cos(a,b):return sum(x*y for x,y in zip(a,b))/(math.sqrt(sum(x*x for x in a))*math.sqrt(sum(y*y for y in b)))
+def validate_python_code(code):
+  allowed_calls={'abs','all','any','enumerate','len','list','max','min','range','set','sorted','sum','tuple'}
+  forbidden=(ast.Import,ast.ImportFrom,ast.Attribute,ast.Lambda,ast.Yield,ast.YieldFrom,ast.Global,ast.Nonlocal)
+  try:
+   tree=ast.parse(code)
+  except SyntaxError as exc:
+   raise RuntimeError(f'python-code contains invalid syntax: {exc}') from exc
+  for node in ast.walk(tree):
+   if isinstance(node,forbidden):raise RuntimeError(f'python-code uses forbidden syntax: {type(node).__name__}')
+   if isinstance(node,ast.Call):
+    if not isinstance(node.func,ast.Name):raise RuntimeError('python-code call targets must be simple names')
+    if node.func.id not in allowed_calls and node.func.id!='merge_intervals':raise RuntimeError(f'python-code uses forbidden call: {node.func.id}')
+
 def validate(kind,d,s):
  if kind=='exact-chat':
   ch=d.get('choices',[{}])[0];content=(ch.get('message',{}).get('content') or '').strip();reasoning=ch.get('message',{}).get('reasoning_content')
@@ -49,7 +62,8 @@ def validate(kind,d,s):
   if not match:raise RuntimeError(f'python-code response has no fenced Python block; response={content[:1000]!r}')
   code=match.group(1);count=code.count('assert ')
   if count!=3:raise RuntimeError(f'python-code expected exactly 3 assert statements, found {count}; code={code[:1500]!r}')
-  namespace={}
+  validate_python_code(code)
+  namespace={'__builtins__':{}}
   try:exec(code,namespace,namespace)
   except Exception as exc:raise RuntimeError(f'python-code execution failed: {type(exc).__name__}: {exc}; code={code[:1500]!r}') from exc
   func=namespace.get('merge_intervals')
@@ -109,9 +123,15 @@ def save_result(model,spec_id,kind,status,elapsed,before,loaded,running,after,da
 def main():
  p=argparse.ArgumentParser();p.add_argument('model');p.add_argument('--spec-id');p.add_argument('--base',required=True);p.add_argument('--key',required=True);a=p.parse_args();spec_id=a.spec_id or a.model;spec=yaml.safe_load((ROOT/'tests/models.yaml').read_text())['tests'][spec_id];kind=spec['kind'];unload(a.base,a.key);before=metrics(a.base,a.key);start=time.monotonic();st=0;data={};loaded={};running={'running':[]};after={'running':[]};error=None
  try:
-  if kind in {'exact-chat','python-code','bayes-reasoning','vision-shape'}:st,b,_=chat(a.base,a.key,a.model,spec);data=json.loads(b)
-  elif kind=='embedding-similarity':st,b,_=request(a.base,a.key,'/v1/embeddings',{'model':a.model,'input':spec['inputs']});data=json.loads(b)
-  elif kind=='rerank':st,b,_=request(a.base,a.key,'/v1/rerank',{'model':a.model,'query':spec['query'],'documents':spec['documents']});data=json.loads(b)
+  if kind in {'exact-chat','python-code','bayes-reasoning','vision-shape'}:
+   st,b,_=chat(a.base,a.key,a.model,spec);data=json.loads(b)
+   if st!=200:raise RuntimeError(f'chat HTTP {st}: {error_message(b)}')
+  elif kind=='embedding-similarity':
+   st,b,_=request(a.base,a.key,'/v1/embeddings',{'model':a.model,'input':spec['inputs']});data=json.loads(b)
+   if st!=200:raise RuntimeError(f'embeddings HTTP {st}: {error_message(b)}')
+  elif kind=='rerank':
+   st,b,_=request(a.base,a.key,'/v1/rerank',{'model':a.model,'query':spec['query'],'documents':spec['documents']});data=json.loads(b)
+   if st!=200:raise RuntimeError(f'rerank HTTP {st}: {error_message(b)}')
   elif kind=='tts':
    st,b,_=request(a.base,a.key,'/v1/audio/speech',{'model':a.model,'input':spec['text'],'voice':spec['voice']})
    if st!=200:raise RuntimeError(f'TTS HTTP {st}: {error_message(b)}')

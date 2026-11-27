@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Run Docker Compose with project .env values isolated from stale shell exports.
+set -Eeuo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+ENV_FILE="$ROOT/.env"
+COMPOSE_FILE="$ROOT/compose.yaml"
+[[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE" >&2; exit 2; }
+keys=()
+while IFS= read -r line; do
+  [[ "$line" =~ ^[[:space:]]*# || ! "$line" =~ = ]] && continue
+  key=${line%%=*}; key=${key//[[:space:]]/}
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && keys+=("$key")
+done <"$ENV_FILE"
+unset_args=()
+for key in "${keys[@]}"; do unset_args+=(-u "$key"); done
+exec env "${unset_args[@]}" docker compose \
+  --project-directory "$ROOT" \
+  --env-file "$ENV_FILE" \
+  -f "$COMPOSE_FILE" \
+  "$@"
