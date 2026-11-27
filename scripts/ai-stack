@@ -8,10 +8,15 @@ usage(){ cat <<'EOF'
 Usage: ./scripts/ai-stack COMMAND [ARGS]
  start | stop | status | models | config | validate | ui
  model-status [TRACK]  Inventory expected/missing/unreferenced files
+ model-config ACTION     Show, set, or apply per-model runtime policy
+ env-clean               Print commands that remove project variables from this shell
+ check-embedding [ARGS]  Validate RAG model ID, discovery, vectors, and semantics
+ compose ARGS...         Run Docker Compose with isolated .env precedence
  model-sync [TRACK]    Download/update selected registry track
  model-prune [TRACK]   Dry-run quarantine of unreferenced files
+ sync-all [OPTIONS]    Reconcile registry, template, env, and files (dry-run by default)
  roster                Show active/candidate roster and test coverage
- test MODEL_ID         Run one active semantic/lifecycle test
+ test MODEL_ID [SPEC]  Run one model with its default or specified test
  test-all              Run every active test sequentially
  protocol SUITE        Run static|smoke|active|exposed|openwebui|full|soak
  unload [MODEL_ID]     Unload one or all models
@@ -21,17 +26,22 @@ EOF
 cmd=${1:-help}; shift || true
 case "$cmd" in
  start) exec ./scripts/start;; stop) exec ./scripts/stop;; validate) exec ./scripts/validate;;
- status) curl -fsS "$BASE/health"; echo; curl -fsS "${AUTH[@]}" "$BASE/running"|python3 -m json.tool; curl -fsS "${AUTH[@]}" "$BASE/metrics"|grep -E '^llamaswap_(memory|gpu_memory|gpu_util).* [0-9]'; docker compose ps 2>/dev/null||true;;
+ status) curl -fsS "$BASE/health"; echo; curl -fsS "${AUTH[@]}" "$BASE/running"|python3 -m json.tool; curl -fsS "${AUTH[@]}" "$BASE/metrics"|grep -E '^llamaswap_(memory|gpu_memory|gpu_util).* [0-9]'; ./scripts/compose-safe ps 2>/dev/null||true;;
  models) curl -fsS "${AUTH[@]}" "$BASE/v1/models"|python3 -c 'import json,sys;d=json.load(sys.stdin);print(f"{ID:<34} {STATE:<9} {CTX:<7} DESCRIPTION");[(print(f"{x["id"]:<34} {x.get("status",{}).get("value","?"):<9} {str(x.get("context_length","-")):<7} {x.get("description","")}")) for x in d["data"] if x.get("meta",{}).get("llamaswap",{}).get("type")=="model"]';;
  config) sed -n '/^models:/,$p' config/llama-swap.yaml;;
  model-status) exec python3 scripts/model-manager.py --track "${1:-active}" status;;
+ model-config) exec python3 scripts/model-config.py "$@";;
+ env-clean) exec ./scripts/env-clean;;
+ check-embedding) exec python3 scripts/check-embedding-endpoint.py "$@";;
+ compose) exec ./scripts/compose-safe "$@";;
  model-sync) exec python3 scripts/model-manager.py --track "${1:-active}" sync;;
  model-prune) track=${1:-active}; shift || true; exec python3 scripts/model-manager.py --track "$track" prune "$@";;
  roster) exec ./scripts/test-coverage;;
- test) [[ $# == 1 ]]||{ usage;exit 2;}; exec python3 tests/run.py "$1" --base "$BASE" --key "$AI_API_KEY";;
+ test) [[ $# -ge 1 && $# -le 2 ]]||{ usage;exit 2;}; model=$1; spec=${2:-}; args=("$model"); [[ -n "$spec" ]] && args+=(--spec-id "$spec"); exec python3 tests/run.py "${args[@]}" --base "$BASE" --key "$AI_API_KEY";;
  test-all) exec ./scripts/test-protocol active;;
  protocol) suite=${1:-smoke}; (($#)) && shift; exec ./scripts/test-protocol "$suite" "$@";;
  unload) if (($#));then curl -fsS -X POST "${AUTH[@]}" "$BASE/api/models/unload/${1//\//%2F}";else curl -fsS -X POST "${AUTH[@]}" "$BASE/api/models/unload";fi;echo;;
  logs) if (($#));then curl -NsS "${AUTH[@]}" "$BASE/logs/stream/$1";else curl -fsS "${AUTH[@]}" "$BASE/logs";fi;;
+ sync-all) exec python3 scripts/sync-all.py "$@";;
  ui) printf 'Management: %s/ui\nOpenAI API: %s/v1\nMedia: http://%s:9293/\n' "$BASE" "$BASE" "${AI_BIND:-127.0.0.1}";;
  help|-h|--help) usage;; *) usage;exit 2;; esac
